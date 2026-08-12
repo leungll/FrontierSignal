@@ -1,10 +1,13 @@
 # Frontier Signal
 
-Frontier Signal is an automated radar for AI engineers. It scans leading research
-labs, engineering blogs, arXiv, and Hacker News, then ranks, deduplicates, and
-summarizes the most relevant updates.
+Frontier Signal is a frontier-tracking tool built for AI engineers. It
+automatically follows the latest developments across leading research labs,
+engineering blogs, arXiv, and Hacker News, helping you quickly find what is
+actually worth your attention.
 
-Daily and weekly reports are delivered directly to Lark, Slack, Discord,
+It uses AI models to assist with content filtering, automatically removes
+duplicates, and generates concise summaries. The results are ranked by importance
+into daily and weekly selections, then delivered to Lark, Slack, Discord,
 Telegram, or your terminal.
 
 It focuses on agent systems, model serving, evaluations, context engineering,

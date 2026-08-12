@@ -1,13 +1,13 @@
 # Frontier Signal
 
-Frontier Signal 是为 AI 工程师打造的前沿追踪工具，自动帮你盯紧领域内的最新进展。它扫描
-前沿实验室、工程博客、arXiv 和 Hacker News，对最相关的内容进行排序、去重和总结。
+Frontier Signal 是为 AI 工程师打造的前沿追踪工具，自动关注领域内的最新进展。它持续扫描前沿实验室、
+工程博客、arXiv 和 Hacker News，帮助你快速发现真正值得关注的内容。
 
-每天和每周的摘要会主动推送到飞书、Slack、Discord、Telegram 或你的终端。
+系统使用 AI 模型辅助完成内容筛选，自动去除重复内容并生成简洁摘要，最终整理成按重要程度排序的每日
+和每周精选，推送到飞书、Slack、Discord、Telegram 或终端。
 
 它重点关注 Agent 系统、模型服务、评测、上下文工程、Memory、MCP、工具调用、AI Coding、
-RAG、RSI（Recursive Self-Improvement）、分布式训练与推理，以及生产级 AI 基础设施，同时
-过滤融资、政策和泛科技新闻。
+RAG、RSI（Recursive Self-Improvement）、分布式训练与推理，以及生产级 AI 基础设施。
 
 [English](./README.md) · [系统设计](./docs/design.md) ·
 [参与贡献](./CONTRIBUTING.md)
