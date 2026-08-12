@@ -1,10 +1,15 @@
 # Frontier Signal
 
-**Frontier AI engineering papers, ideas, and systems — filtered and ranked daily.**
+Frontier Signal is an automated radar for AI engineers. It scans leading research
+labs, engineering blogs, arXiv, and Hacker News, then ranks, deduplicates, and
+summarizes the most relevant updates.
 
-It scans research labs, engineering blogs, arXiv, and Hacker News, then filters,
-deduplicates, summarizes, and delivers the results to Lark, Slack, Discord,
+Daily and weekly reports are delivered directly to Lark, Slack, Discord,
 Telegram, or your terminal.
+
+It focuses on agent systems, model serving, evaluations, context engineering,
+memory, MCP, AI coding, RAG, and production AI infrastructure—while filtering out
+funding, policy, and generic tech news.
 
 [简体中文](./README.zh-CN.md) · [System design](./docs/design.md) ·
 [Contributing](./CONTRIBUTING.md)
@@ -51,7 +56,7 @@ Requirements: [uv](https://docs.astral.sh/uv/) and Python 3.11+.
 ### 1. Install and preview
 
 ```bash
-git clone https://github.com/ll-leung/ai-research-radar.git frontier-signal
+git clone https://github.com/leungll/FrontierSignal.git frontier-signal
 cd frontier-signal
 uv sync
 uv run radar preview
@@ -70,10 +75,10 @@ uv run radar init
 
 The setup wizard has four steps:
 
-1. Choose a provider and set the filtering and summary models
-2. Choose a delivery channel and enter its connection details
-3. Choose English or Chinese reports
-4. Set the daily delivery time
+- **Step 1:** Choose a provider and set the filtering and summary models
+- **Step 2:** Choose a delivery channel and enter its connection details
+- **Step 3:** Choose English or Chinese reports
+- **Step 4:** Set the daily delivery time
 
 The result is saved to `.env`. The wizard detects the local timezone and updates
 the GitHub Actions schedule. API keys and webhooks are hidden while you enter
@@ -218,45 +223,54 @@ collapsible card; the other delivery channels use Markdown.
 
 ## Daily automation
 
-The repository includes GitHub Actions workflows for daily and weekly reports.
-Once configured, neither your computer nor a separate server needs to stay
-running: GitHub fetches the content, builds the report, and delivers it on
-schedule.
+Use GitHub Actions to send daily and weekly reports on schedule, with no server
+of your own:
 
-### Deploy with GitHub Actions
+1. Fork and clone this repository.
+2. Run `uv run radar init` to complete the setup.
+3. Open **Settings → Secrets and variables → Actions** in your repository and add
+   each item printed at the end of `radar init`:
+   - On the **Variables** tab, click **New repository variable**, then enter its name and value.
+   - On the **Secrets** tab, click **New repository secret**, then enter sensitive values such as API keys and webhooks.
+   - Click **Add variable** or **Add secret** to save each item.
+4. Commit and push [`.github/workflows/daily.yml`](./.github/workflows/daily.yml),
+   then test it once from **Actions → Frontier Signal Daily → Run workflow**.
 
-1. Fork the repository and clone your fork locally.
-2. Run `uv run radar init` to configure models, delivery, language, and delivery
-   time.
-3. The wizard prints the Variables and Secrets required by GitHub Actions. Add
-   them under **Settings → Secrets and variables → Actions** in your repository.
-4. `radar init` updates the daily schedule for your local timezone. Commit and
-   push the change to
-   [`.github/workflows/daily.yml`](./.github/workflows/daily.yml).
-5. Open **Actions → Frontier Signal Daily → Run workflow** and trigger one run manually.
-   Once the report reaches the configured channel, scheduled delivery is ready.
+**Variables (the first five are required)**
 
-Keep ordinary configuration in Variables and sensitive values in Secrets:
-
-| Type | Contents |
+| Name | Example value |
 |---|---|
-| Variables | Provider, filter model, summary model, delivery channel, report language, and an optional OpenAI-compatible base URL |
-| Secrets | Model API key and channel credentials such as Lark or Slack webhooks and Telegram tokens |
+| `LLM_PROVIDER` | `anthropic` or `openai` |
+| `FILTER_MODEL` | `claude-haiku-4-5-20251001` or `gpt-4o-mini` |
+| `SUMMARY_MODEL` | `claude-opus-4-8` or `gpt-4o` |
+| `NOTIFIER` | `lark`, `slack`, `discord`, `telegram`, or `console` |
+| `LANGUAGE` | `zh` for Chinese or `en` for English |
+| `OPENAI_BASE_URL` | Only for OpenAI-compatible services; omit for OpenAI itself |
 
-Once configured, `Frontier Signal Daily` delivers the report automatically each day and can
-also be run manually from the Actions page. `Frontier Signal Weekly` summarizes the
-previous seven days of selected content. To change its delivery time, edit the
-cron schedule in [`.github/workflows/weekly.yml`](./.github/workflows/weekly.yml).
+**Secrets (add only those required by your choices)**
 
-The workflow remembers processed articles so later reports do not deliver them
-again. This history stays in the GitHub Actions cache and is never written to the
-repository. The local embedding model is cached as well, reducing startup time on
-later runs.
+| Use case | Name | Value |
+|---|---|---|
+| Claude | `ANTHROPIC_API_KEY` | Anthropic API key |
+| OpenAI / compatible | `OPENAI_API_KEY` | API key from the provider |
+| Lark / Feishu | `LARK_WEBHOOK_URL` | Custom bot webhook URL |
+| Lark signature verification (optional) | `LARK_WEBHOOK_SECRET` | Custom bot signing secret |
+| Slack | `SLACK_WEBHOOK_URL` | Incoming webhook URL |
+| Discord | `DISCORD_WEBHOOK_URL` | Webhook URL |
+| Telegram | `TELEGRAM_BOT_TOKEN` | Token provided by @BotFather |
+| Telegram | `TELEGRAM_CHAT_ID` | Chat ID that receives the report |
 
-Hosted model services such as Anthropic and OpenAI require no additional network
-setup. If you choose Ollama, GitHub Actions cannot connect to `localhost` on your
-computer; use an Ollama address reachable by the GitHub runner or run a
-self-hosted runner on your own machine.
+For example, OpenAI + Lark requires `OPENAI_API_KEY`, `LARK_WEBHOOK_URL` (plus
+`LARK_WEBHOOK_SECRET` if signature verification is enabled), and the first five
+Variables above. Names must match exactly; do not wrap values in quotes.
+
+Once the test succeeds, the daily report runs automatically and the weekly report
+summarizes the previous seven days. Change delivery times in
+[`daily.yml`](./.github/workflows/daily.yml) and
+[`weekly.yml`](./.github/workflows/weekly.yml).
+
+> GitHub Actions cannot reach Ollama at `localhost`. Use a publicly reachable
+> endpoint or a self-hosted runner.
 
 ---
 

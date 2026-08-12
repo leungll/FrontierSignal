@@ -1,9 +1,12 @@
 # Frontier Signal
 
-**每日筛选并排序前沿 AI 工程论文、技术思路与系统。**
+Frontier Signal 是为 AI 工程师打造的自动化技术雷达。它扫描前沿实验室、工程博客、arXiv
+和 Hacker News，对最相关的内容进行排序、去重和总结。
 
-每天扫描前沿实验室、工程博客、arXiv 和 Hacker News，经筛选、去重和总结后推送到
-飞书、Slack、Discord、Telegram 或终端。
+日报和周报会直接推送到飞书、Slack、Discord、Telegram 或终端。
+
+它重点关注 Agent 系统、模型服务、评测、上下文工程、Memory、MCP、AI Coding、RAG 和
+生产级 AI 基础设施，同时过滤融资、政策和泛科技新闻。
 
 [English](./README.md) · [系统设计](./docs/design.md) ·
 [参与贡献](./CONTRIBUTING.md)
@@ -47,7 +50,7 @@ P0 必读、P1 延伸阅读组织，最后给出今日趋势和 30 分钟阅读�
 ### 1. 安装与预览
 
 ```bash
-git clone https://github.com/ll-leung/ai-research-radar.git frontier-signal
+git clone https://github.com/leungll/FrontierSignal.git frontier-signal
 cd frontier-signal
 uv sync
 uv run radar preview
@@ -65,10 +68,10 @@ uv run radar init
 
 初始化向导分为四步：
 
-1. 选择模型服务，并设置初筛模型和总结模型
-2. 选择推送渠道，并填写对应的连接信息
-3. 选择中文或英文报告
-4. 设置每天的发送时间
+- **Step 1：** 选择模型服务，并设置初筛模型和总结模型
+- **Step 2：** 选择推送渠道，并填写对应的连接信息
+- **Step 3：** 选择中文或英文报告
+- **Step 4：** 设置每天的发送时间
 
 完成后，配置会保存到 `.env`。向导会自动读取本机时区并更新 GitHub Actions 的运行
 时间。输入 API key 或 webhook 时，终端不会显示内容；保存成功后会给出明确提示。
@@ -207,38 +210,47 @@ P0 / P1、逐条总结、今日趋势和阅读建议。
 
 ## 每日自动运行
 
-项目内置日报和周报的 GitHub Actions 工作流。配置完成后，无需保持本机或服务器运行；
-GitHub 会按设定时间抓取内容、生成报告并发送到目标渠道。
+用 GitHub Actions 定时发送日报和周报，无需自建服务器：
 
-### 部署到 GitHub Actions
+1. Fork 并克隆本仓库。
+2. 运行 `uv run radar init` 完成配置。
+3. 打开仓库的 **Settings → Secrets and variables → Actions**，按 `radar init` 最后的输出逐项添加：
+   - 在 **Variables** 页点击 **New repository variable**，填写变量名和值。
+   - 在 **Secrets** 页点击 **New repository secret**，填写 API Key、Webhook 等敏感信息。
+   - 每项填写后点击 **Add variable** 或 **Add secret** 保存。
+4. 提交并推送 [`.github/workflows/daily.yml`](./.github/workflows/daily.yml)，然后在 **Actions → Frontier Signal Daily → Run workflow** 试跑一次。
 
-1. Fork 本仓库，并将 Fork 后的仓库克隆到本地。
-2. 运行 `uv run radar init`，完成模型、推送渠道、语言和发送时间设置。
-3. 向导结束时会列出 GitHub Actions 需要的 Variables 和 Secrets。打开仓库的
-   **Settings → Secrets and variables → Actions**，按提示逐项添加。
-4. `radar init` 会根据本机时区更新日报时间。提交并推送
-   [`.github/workflows/daily.yml`](./.github/workflows/daily.yml) 的修改。
-5. 打开仓库的 **Actions → Frontier Signal Daily → Run workflow**，手动运行一次，确认目标渠道
-   能收到日报。验证通过后，工作流会按计划自动运行。
+**Variables（前五项必填）**
 
-普通配置放在 Variables，敏感信息放在 Secrets：
-
-| 类型 | 内容 |
+| Name | Value 示例 |
 |---|---|
-| Variables | 模型服务、初筛模型、总结模型、推送渠道、报告语言，以及可选的 OpenAI-compatible 地址 |
-| Secrets | 模型 API key，以及飞书 webhook、Slack webhook、Telegram token 等渠道凭据 |
+| `LLM_PROVIDER` | `anthropic` 或 `openai` |
+| `FILTER_MODEL` | `claude-haiku-4-5-20251001` 或 `gpt-4o-mini` |
+| `SUMMARY_MODEL` | `claude-opus-4-8` 或 `gpt-4o` |
+| `NOTIFIER` | `lark`、`slack`、`discord`、`telegram` 或 `console` |
+| `LANGUAGE` | 中文填 `zh`，英文填 `en` |
+| `OPENAI_BASE_URL` | 仅 OpenAI-compatible 服务需要；官方 OpenAI 无需添加 |
 
-配置完成后，`Frontier Signal Daily` 会每天自动发送日报，也可以随时在 Actions 页面手动运行。
-`Frontier Signal Weekly` 汇总最近七天的入选内容并生成周报；需要修改周报时间时，编辑
-[`.github/workflows/weekly.yml`](./.github/workflows/weekly.yml) 中的 cron 设置。
+**Secrets（按你的选择添加）**
 
-工作流会保留已经处理过的文章，避免后续日报重复推送；这些历史记录只保存在 GitHub
-Actions 缓存中，不会写入仓库。本地 embedding 模型也会被缓存，以减少后续运行的启动
-时间。
+| 使用场景 | Name | Value |
+|---|---|---|
+| Claude | `ANTHROPIC_API_KEY` | Anthropic API Key |
+| OpenAI / compatible | `OPENAI_API_KEY` | 服务商提供的 API Key |
+| 飞书 / Lark | `LARK_WEBHOOK_URL` | 自定义机器人 Webhook 地址 |
+| 飞书签名校验（可选） | `LARK_WEBHOOK_SECRET` | 自定义机器人的签名密钥 |
+| Slack | `SLACK_WEBHOOK_URL` | Incoming Webhook 地址 |
+| Discord | `DISCORD_WEBHOOK_URL` | Webhook 地址 |
+| Telegram | `TELEGRAM_BOT_TOKEN` | @BotFather 提供的 Token |
+| Telegram | `TELEGRAM_CHAT_ID` | 接收消息的 Chat ID |
 
-使用 Anthropic、OpenAI 等在线模型服务时无需额外处理。如果选择 Ollama，GitHub Actions
-不能直接连接你电脑上的 `localhost`；需要使用 GitHub runner 可以访问的 Ollama 地址，
-或者在自己的机器上运行 self-hosted runner。
+例如选择 OpenAI + 飞书，只需添加 `OPENAI_API_KEY`、`LARK_WEBHOOK_URL`（启用签名校验时再添加
+`LARK_WEBHOOK_SECRET`），以及 Variables 表中的前五项。名称必须完全一致，值不要加引号。
+
+成功后，日报会每天自动发送；周报会汇总最近 7 天的内容。发送时间可在
+[`daily.yml`](./.github/workflows/daily.yml) 和 [`weekly.yml`](./.github/workflows/weekly.yml) 中修改。
+
+> 使用 Ollama 时，GitHub Actions 无法访问本机 `localhost`，请提供可公网访问的地址或使用 self-hosted runner。
 
 ---
 
