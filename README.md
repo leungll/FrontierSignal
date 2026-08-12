@@ -228,13 +228,32 @@ of your own:
 
 1. Fork and clone this repository.
 2. Run `uv run radar init` to complete the setup.
-3. Open **Settings → Secrets and variables → Actions** in your repository and add
-   each item printed at the end of `radar init`:
+3. Open **Settings → Secrets and variables → Actions** in your repository and
+   **add each item exactly as printed at the end of `radar init`**:
    - On the **Variables** tab, click **New repository variable**, then enter its name and value.
    - On the **Secrets** tab, click **New repository secret**, then enter sensitive values such as API keys and webhooks.
    - Click **Add variable** or **Add secret** to save each item.
 4. Commit and push [`.github/workflows/daily.yml`](./.github/workflows/daily.yml),
    then test it once from **Actions → Frontier Signal Daily → Run workflow**.
+
+For example, Anthropic + Lark + English produces:
+
+```text
+GitHub Actions repository variables
+  LLM_PROVIDER=anthropic
+  FILTER_MODEL=claude-haiku-4-5-20251001
+  SUMMARY_MODEL=claude-opus-4-8
+  NOTIFIER=lark
+  LANGUAGE=en
+
+GitHub Actions repository secrets
+  ANTHROPIC_API_KEY
+  LARK_WEBHOOK_URL
+  LARK_WEBHOOK_SECRET (optional)
+```
+
+Add both the name and value for each variable. For each secret, use the name shown
+above and the secret value you entered during `radar init`.
 
 **Variables (the first five are required)**
 
@@ -289,12 +308,12 @@ Tests use local fixtures and HTTP mocks, so they require no network access, mode
 API key, or webhook. After changing filtering, deduplication, ranking, or
 rendering, run the full test suite and inspect real output with:
 
-```bash
-uv run radar preview                         # run an isolated preview
-uv run radar test-layout --channel console  # inspect Markdown output
-uv run radar test-layout --channel lark     # inspect the Lark card
-uv run radar sources                         # inspect source health
-```
+| Purpose | Command |
+|---|---|
+| Run an isolated preview | `uv run radar preview` |
+| Inspect Markdown output | `uv run radar test-layout --channel console` |
+| Inspect the Lark card | `uv run radar test-layout --channel lark` |
+| Inspect source health | `uv run radar sources` |
 
 Small interfaces isolate sources, models, and delivery channels, so extensions
 remain local:
@@ -329,10 +348,6 @@ committed. YAML files contain version-controlled content policy such as sources,
 topic weights, and source quotas. Environment variables override values from
 `.env`; GitHub Actions uses this mechanism to load repository Variables and
 Secrets.
-
-Advanced settings include `LLM_MIN_RELEVANCE`, `LLM_MAX_CANDIDATES`,
-`TRUSTED_AUTHORITY`, `COLD_START_DAYS`, `MAX_CONCURRENCY`, and `PER_SOURCE_CAP`.
-Their defaults are defined in [`radar/config.py`](./radar/config.py).
 
 ## Project scope
 

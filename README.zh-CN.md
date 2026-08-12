@@ -214,11 +214,30 @@ P0 / P1、逐条总结、今日趋势和阅读建议。
 
 1. Fork 并克隆本仓库。
 2. 运行 `uv run radar init` 完成配置。
-3. 打开仓库的 **Settings → Secrets and variables → Actions**，按 `radar init` 最后的输出逐项添加：
+3. 打开仓库的 **Settings → Secrets and variables → Actions**，**按 `radar init` 最后的输出逐项添加**：
    - 在 **Variables** 页点击 **New repository variable**，填写变量名和值。
    - 在 **Secrets** 页点击 **New repository secret**，填写 API Key、Webhook 等敏感信息。
    - 每项填写后点击 **Add variable** 或 **Add secret** 保存。
 4. 提交并推送 [`.github/workflows/daily.yml`](./.github/workflows/daily.yml)，然后在 **Actions → Frontier Signal Daily → Run workflow** 试跑一次。
+
+例如，选择 Anthropic + Lark + 英文报告时，向导会输出：
+
+```text
+GitHub Actions repository variables
+  LLM_PROVIDER=anthropic
+  FILTER_MODEL=claude-haiku-4-5-20251001
+  SUMMARY_MODEL=claude-opus-4-8
+  NOTIFIER=lark
+  LANGUAGE=en
+
+GitHub Actions repository secrets
+  ANTHROPIC_API_KEY
+  LARK_WEBHOOK_URL
+  LARK_WEBHOOK_SECRET (optional)
+```
+
+Variables 需要同时填写名称和值；Secrets 使用上面显示的名称，值填写你在 `radar init`
+中输入的密钥或 Webhook。
 
 **Variables（前五项必填）**
 
@@ -268,12 +287,12 @@ uv run ruff format --check .
 测试使用本地 fixture 和 HTTP mock，不需要网络、模型 API key 或 webhook。修改筛选、
 去重、排序和排版后，应先运行完整测试，再使用以下命令检查真实输出：
 
-```bash
-uv run radar preview                         # 运行一次独立预览
-uv run radar test-layout --channel console  # 检查 Markdown 输出
-uv run radar test-layout --channel lark     # 检查飞书卡片
-uv run radar sources                         # 查看各信息源的抓取状态
-```
+| 用途 | 命令 |
+|---|---|
+| 运行一次独立预览 | `uv run radar preview` |
+| 检查 Markdown 输出 | `uv run radar test-layout --channel console` |
+| 检查飞书卡片 | `uv run radar test-layout --channel lark` |
+| 查看各信息源的抓取状态 | `uv run radar sources` |
 
 项目通过小型接口隔离信息源、模型和推送渠道，新增能力不需要修改整条处理流程：
 
@@ -304,10 +323,6 @@ uv run radar sources                         # 查看各信息源的抓取状态
 `.env` 保存当前机器的运行配置和敏感信息，不应提交到 Git。YAML 文件适合保存可以进入
 版本控制的内容策略，例如信息源、主题权重和来源配额。环境变量会覆盖 `.env` 中的同名
 设置，GitHub Actions 正是通过这种方式加载 Variables 和 Secrets。
-
-常用的精细参数包括 `LLM_MIN_RELEVANCE`、`LLM_MAX_CANDIDATES`、
-`TRUSTED_AUTHORITY`、`COLD_START_DAYS`、`MAX_CONCURRENCY` 和
-`PER_SOURCE_CAP`；默认值见 [`radar/config.py`](./radar/config.py)。
 
 ## 项目边界
 
