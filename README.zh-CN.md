@@ -11,6 +11,15 @@ Frontier Signal 是为 AI 工程师打造的自动化技术雷达。它扫描前
 [English](./README.md) · [系统设计](./docs/design.md) ·
 [参与贡献](./CONTRIBUTING.md)
 
+![Author](https://img.shields.io/badge/Author-Lili_Liang-red)
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![LLM](https://img.shields.io/badge/LLM-Anthropic_·_OpenAI_·_Ollama-6E56CF)
+![Embeddings](https://img.shields.io/badge/Embeddings-bge--small-0EA5E9)
+![uv](https://img.shields.io/badge/uv-managed-DE5FE9)
+![Last commit](https://img.shields.io/github/last-commit/leungll/FrontierSignal?color=yellow)
+![Repo size](https://img.shields.io/github/repo-size/leungll/FrontierSignal)
+![Top language](https://img.shields.io/github/languages/top/leungll/FrontierSignal?color=orange)
+
 ---
 
 ## 关注什么
