@@ -8,8 +8,9 @@ Daily and weekly reports are delivered directly to Lark, Slack, Discord,
 Telegram, or your terminal.
 
 It focuses on agent systems, model serving, evaluations, context engineering,
-memory, MCP, AI coding, RAG, and production AI infrastructure—while filtering out
-funding, policy, and generic tech news.
+memory, MCP, tool use, AI coding, RAG, RSI (recursive self-improvement),
+distributed training and inference, and production AI infrastructure—while
+filtering out funding, policy, and generic tech news.
 
 [简体中文](./README.zh-CN.md) · [System design](./docs/design.md) ·
 [Contributing](./CONTRIBUTING.md)
