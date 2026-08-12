@@ -1,0 +1,57 @@
+name: Frontier Signal Weekly
+
+on:
+  schedule:
+    # Sunday 23:30 UTC = Monday 07:30 Asia/Shanghai — after Sunday's daily run.
+    - cron: "30 23 * * 0"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-radar
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install deps
+        run: uv sync
+
+      # Read the dedup DB the daily runs built up (weekly synthesizes its items).
+      - name: Restore radar state
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: radar-state-${{ github.run_id }}
+          restore-keys: radar-state-
+
+      - name: Run weekly deep dive
+        env:
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+          FILTER_MODEL: ${{ vars.FILTER_MODEL }}
+          SUMMARY_MODEL: ${{ vars.SUMMARY_MODEL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
+          NOTIFIER: ${{ vars.NOTIFIER }}
+          LARK_WEBHOOK_URL: ${{ secrets.LARK_WEBHOOK_URL }}
+          LARK_WEBHOOK_SECRET: ${{ secrets.LARK_WEBHOOK_SECRET }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          LANGUAGE: ${{ vars.LANGUAGE || 'zh' }}
+        run: uv run radar weekly

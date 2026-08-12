@@ -1,0 +1,56 @@
+# Phase 1 scoring is keyword-based. Phase 2 replaces `topics` with an embedding
+# interest-vector; the kill_list stays as a hard veto at every phase.
+
+# Matched against title + summary. Each hit adds `weight` to the score.
+topics:
+  - { pattern: "(?i)\\b(ai )?agents?\\b",                       weight: 1.0 }
+  - { pattern: "(?i)\\bagent(ic)? (runtime|loop|harness|framework)\\b", weight: 1.2 }
+  - { pattern: "(?i)\\b(llm|model) serving\\b",                 weight: 1.2 }
+  - { pattern: "(?i)\\binference (engine|optimi|latency|throughput)", weight: 1.2 }
+  - { pattern: "(?i)\\b(vllm|sglang|tensorrt|triton)\\b",        weight: 1.2 }
+  - { pattern: "(?i)\\beval(uation)?s?\\b",                      weight: 1.0 }
+  - { pattern: "(?i)\\bcontext (engineering|window|management)\\b", weight: 1.2 }
+  - { pattern: "(?i)\\bmemory\\b",                               weight: 0.8 }
+  - { pattern: "(?i)\\bmcp\\b|model context protocol",           weight: 1.2 }
+  - { pattern: "(?i)\\btool (calling|use)\\b",                   weight: 1.2 }
+  - { pattern: "(?i)\\bai infra(structure)?\\b",                 weight: 1.2 }
+  - { pattern: "(?i)\\bdistributed (training|inference|systems)\\b", weight: 1.0 }
+  - { pattern: "(?i)\\bai coding\\b|coding agent",               weight: 1.0 }
+  - { pattern: "(?i)\\bproduction\\b",                           weight: 0.7 }
+  - { pattern: "(?i)\\bself[- ]improv(ing|ement)\\b",            weight: 1.0 }
+  - { pattern: "(?i)\\blong[- ]running\\b",                      weight: 0.8 }
+  - { pattern: "(?i)\\b(rag|retrieval[- ]augmented)\\b",         weight: 0.6 }
+  - { pattern: "(?i)\\b(benchmark|throughput|latency|kv[- ]cache)\\b", weight: 0.9 }
+  - { pattern: "(?i)\\b(architecture|internals|deep dive|post[- ]mortem)\\b", weight: 0.8 }
+
+# Hard veto — any hit drops the item regardless of topic score.
+kill_list:
+  title_patterns:
+    - "(?i)\\braises?\\b.*\\b(series [a-e]|seed|\\$\\d+\\s*[mb])\\b"
+    - "(?i)\\b(valuation|ipo|acquires?|acquisition|funding round)\\b"
+    - "(?i)\\b(top|best) \\d+\\b|\\bultimate guide\\b|\\byou should know\\b"
+    - "(?i)\\bai (regulation|policy|bill|act|executive order|lawsuit)\\b"
+    - "(?i)\\b(hiring|we're hiring|join our team|careers)\\b"
+  domains:
+    - techcrunch.com
+    - venturebeat.com
+    - businessinsider.com
+
+# Items scoring below this are archived but not reported.
+min_score: 1.0
+# Max items in a daily report.
+max_report_items: 8
+# Even on a quiet day, report at least this many (top-scored).
+floor_report_items: 3
+# How many of the selected items are marked P0 (the must-reads at the top). The
+# rest become P1 (rendered in a collapsible section). Fewer = more selective P0.
+p0_count: 3
+
+# Per-source caps: max items a single source may contribute to one report.
+# Stops high-volume sources (arXiv, Hacker News) from crowding out sparser but
+# high-signal engineering blogs. Sources not listed here are uncapped. If capped
+# sources leave slots empty (e.g. blogs were quiet), the report backfills by rank
+# so it still reaches max_report_items — the cap is a preference, not a hard wall.
+source_caps:
+  arxiv: 3        # papers are valuable but must not dominate
+  hackernews: 2   # community signal, keep it a garnish

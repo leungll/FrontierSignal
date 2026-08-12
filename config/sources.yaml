@@ -1,0 +1,120 @@
+# RSS/Atom sources. Add sources here, not in code.
+#
+# authority: 0.0-1.0, hand-tuned. Two effects:
+#   - amplifies keyword score (a trusted source's relevant item ranks higher)
+#   - >= trusted_authority (0.9) → "fast lane": every post is judged by Claude
+#     regardless of keyword score, so landmark posts aren't buried.
+#
+# All URLs verified live 2026-08. Feeds marked "mirror" have no official RSS;
+# they use a community RSSHub route and may lag or break — swap if they die.
+
+sources:
+  # ---------- Frontier labs (authority 0.9-1.0: fast-lane, landmark-aware) ----------
+  - id: anthropic
+    name: Anthropic
+    # No official RSS; community RSSHub mirror of anthropic.com/news.
+    url: https://rsshub.bestblogs.dev/anthropic/news
+    authority: 1.0
+
+  - id: openai
+    name: OpenAI
+    url: https://openai.com/news/rss.xml
+    authority: 1.0
+
+  - id: deepmind
+    name: Google DeepMind
+    url: https://deepmind.google/blog/rss.xml
+    authority: 0.95
+
+  - id: googleai
+    name: Google AI
+    url: https://blog.google/technology/ai/rss/
+    authority: 0.9
+
+  - id: googleresearch
+    name: Google Research
+    url: https://research.google/blog/rss/
+    authority: 0.9
+
+  - id: metaai
+    name: Meta AI
+    # No official RSS; community RSSHub mirror of ai.meta.com/blog.
+    url: https://rsshub.bestblogs.dev/meta/ai/blog
+    authority: 0.9
+
+  - id: msresearch
+    name: Microsoft Research
+    url: https://www.microsoft.com/en-us/research/feed/
+    authority: 0.9
+
+  - id: huggingface
+    name: Hugging Face
+    url: https://huggingface.co/blog/feed.xml
+    authority: 0.85
+
+  # ---------- Engineering blogs & top researchers ----------
+  - id: lilianweng
+    name: Lilian Weng
+    url: https://lilianweng.github.io/index.xml
+    authority: 1.0
+
+  - id: raschka
+    name: Sebastian Raschka
+    url: https://magazine.sebastianraschka.com/feed
+    authority: 0.9
+
+  - id: chiphuyen
+    name: Chip Huyen
+    url: https://huyenchip.com/feed.xml
+    authority: 0.9
+
+  - id: jayalammar
+    name: Jay Alammar
+    url: https://jalammar.github.io/feed.xml
+    authority: 0.85
+
+  - id: eugeneyan
+    name: Eugene Yan
+    url: https://eugeneyan.com/rss/
+    authority: 0.85
+
+  - id: simonwillison
+    name: Simon Willison
+    url: https://simonwillison.net/atom/everything/
+    authority: 0.85
+
+  - id: philschmid
+    name: Phil Schmid
+    url: https://www.philschmid.de/rss
+    authority: 0.8
+
+  - id: interconnects
+    name: Interconnects (Nathan Lambert)
+    url: https://www.interconnects.ai/feed
+    authority: 0.85
+
+  - id: answerai
+    name: Answer.AI
+    url: https://www.answer.ai/index.xml
+    authority: 0.85
+
+  - id: latentspace
+    name: Latent Space
+    url: https://www.latent.space/feed
+    authority: 0.8
+
+  - id: thegradient
+    name: The Gradient
+    url: https://thegradient.pub/rss/
+    authority: 0.8
+
+  # ---------- Research labs & systems / infra ----------
+  - id: bair
+    name: Berkeley AI Research (BAIR)
+    url: https://bair.berkeley.edu/blog/feed.xml
+    authority: 0.85
+
+  - id: pytorch
+    name: PyTorch
+    url: https://pytorch.org/blog/feed.xml
+    authority: 0.8

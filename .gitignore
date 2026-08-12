@@ -1,0 +1,23 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.backup
+
+# Editor / assistant local settings — personal, not part of the project.
+.claude/
+.vscode/
+.idea/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Runtime state (SQLite dedup DB + sidecars). Local/CI state, never committed.
+# In CI, cross-run state is preserved via actions/cache, not the repo.
+data/
+
+# Local embedding model cache (bge-small weights).
+.cache/
+
