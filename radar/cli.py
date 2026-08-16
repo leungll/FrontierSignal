@@ -77,12 +77,21 @@ def _cron_for(hour_local: int, tz_offset: float) -> str:
     return f"{utc_minute} {utc_hour} * * *"
 
 
-def _write_cron(cron: str) -> bool:
-    """Rewrite the schedule in daily.yml so the user never hand-edits it. Returns
-    True if the file was found and updated."""
+def _weekly_cron_for(weekday: int, hour_local: int, tz_offset: float) -> str:
+    """Return a UTC cron for a local weekday (Monday=0) and hour."""
+    utc_minutes = round((hour_local - tz_offset) * 60)
+    day_delta, minute_of_day = divmod(utc_minutes, 24 * 60)
+    utc_weekday = (weekday + day_delta) % 7
+    cron_weekday = (utc_weekday + 1) % 7  # cron: Sunday=0, Monday=1
+    utc_hour, utc_minute = divmod(minute_of_day, 60)
+    return f"{utc_minute} {utc_hour} * * {cron_weekday}"
+
+
+def _write_cron(workflow: str, cron: str) -> bool:
+    """Rewrite a workflow schedule so the user never hand-edits YAML."""
     import re
 
-    wf = REPO_ROOT / ".github" / "workflows" / "daily.yml"
+    wf = REPO_ROOT / ".github" / "workflows" / workflow
     if not wf.exists():
         return False
     text = wf.read_text(encoding="utf-8")
@@ -90,6 +99,97 @@ def _write_cron(cron: str) -> bool:
     if n:
         wf.write_text(new_text, encoding="utf-8")
     return bool(n)
+
+
+def _configure_schedules() -> None:
+    """Prompt for local delivery times and update both workflow schedules."""
+    daily_hour = -1
+    while not 0 <= daily_hour <= 23:
+        daily_hour = typer.prompt(
+            "What hour should the daily report arrive? (0-23, in your local time)",
+            default=7,
+            type=int,
+        )
+        if not 0 <= daily_hour <= 23:
+            typer.secho(
+                "Enter an hour from 0 to 23. Example: 7 means 07:00, 18 means 18:00.",
+                fg=typer.colors.YELLOW,
+            )
+    typer.secho(f"  Daily report time: {daily_hour:02d}:00", fg=typer.colors.GREEN)
+
+    weekdays = (
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    )
+    weekly_day = 0
+    while not 1 <= weekly_day <= 7:
+        weekly_day = typer.prompt(
+            "Weekly report day (1=Monday, 2=Tuesday, ..., 7=Sunday)",
+            default=1,
+            type=int,
+        )
+        if not 1 <= weekly_day <= 7:
+            typer.secho("Enter a number from 1 to 7.", fg=typer.colors.YELLOW)
+    weekly_hour = -1
+    while not 0 <= weekly_hour <= 23:
+        weekly_hour = typer.prompt(
+            "What hour should the weekly report arrive? (0-23, in your local time)",
+            default=8,
+            type=int,
+        )
+        if not 0 <= weekly_hour <= 23:
+            typer.secho("Enter an hour from 0 to 23.", fg=typer.colors.YELLOW)
+    typer.secho(
+        f"  Weekly report time: {weekdays[weekly_day - 1]} {weekly_hour:02d}:00",
+        fg=typer.colors.GREEN,
+    )
+
+    detected_offset = _local_utc_offset()
+    _hint(f"  Detected this computer's UTC offset: UTC{detected_offset:+g}")
+    if typer.confirm("Use this timezone?", default=True):
+        tz = detected_offset
+    else:
+        tz = typer.prompt("Enter the UTC offset", type=float)
+
+    daily_cron = _cron_for(daily_hour, tz)
+    if _write_cron("daily.yml", daily_cron):
+        typer.secho(
+            f"✓ Set daily schedule to {daily_hour:02d}:00 at UTC{tz:+g} "
+            f'(cron "{daily_cron}") in .github/workflows/daily.yml',
+            fg=typer.colors.GREEN,
+        )
+    else:
+        typer.secho(
+            f'! Could not update .github/workflows/daily.yml (cron "{daily_cron}").',
+            fg=typer.colors.YELLOW,
+        )
+
+    weekly_cron = _weekly_cron_for(weekly_day - 1, weekly_hour, tz)
+    if _write_cron("weekly.yml", weekly_cron):
+        typer.secho(
+            f"✓ Set weekly schedule to {weekdays[weekly_day - 1]} {weekly_hour:02d}:00 at "
+            f'UTC{tz:+g} (cron "{weekly_cron}") in .github/workflows/weekly.yml',
+            fg=typer.colors.GREEN,
+        )
+    else:
+        typer.secho(
+            f'! Could not update .github/workflows/weekly.yml (cron "{weekly_cron}").',
+            fg=typer.colors.YELLOW,
+        )
+
+
+@app.command()
+def schedule() -> None:
+    """Configure daily and weekly GitHub Actions delivery schedules."""
+    typer.secho("\nFrontier Signal", fg=typer.colors.CYAN, bold=True)
+    typer.secho("Schedule", fg=typer.colors.CYAN)
+    _configure_schedules()
+    typer.echo("\nCommit and push the workflow changes to apply the new schedules.")
 
 
 @app.command()
@@ -181,42 +281,10 @@ def init() -> None:
     lines.append(f"LANGUAGE={language}")
 
     _step(4, "Schedule")
-    hour = -1
-    while not 0 <= hour <= 23:
-        hour = typer.prompt(
-            "What hour should the daily report arrive? (0-23, in your local time)",
-            default=7,
-            type=int,
-        )
-        if not 0 <= hour <= 23:
-            typer.secho(
-                "Enter an hour from 0 to 23. Example: 7 means 07:00, 18 means 18:00.",
-                fg=typer.colors.YELLOW,
-            )
-    typer.secho(f"  Daily report time: {hour:02d}:00", fg=typer.colors.GREEN)
-    detected_offset = _local_utc_offset()
-    _hint(f"  Detected this computer's UTC offset: UTC{detected_offset:+g}")
-    if typer.confirm("Use this timezone?", default=True):
-        tz = detected_offset
-    else:
-        tz = typer.prompt("Enter the UTC offset", type=float)
+    _configure_schedules()
 
     env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     typer.secho(f"\n✓ Wrote {env_path}", fg=typer.colors.GREEN, bold=True)
-
-    # Write the schedule straight into the workflow — no hand-editing.
-    cron = _cron_for(hour, tz)
-    if _write_cron(cron):
-        typer.secho(
-            f"✓ Set daily schedule to {hour:02d}:00 at UTC{tz:+g} "
-            f'(cron "{cron}") in .github/workflows/daily.yml',
-            fg=typer.colors.GREEN,
-        )
-    else:
-        typer.secho(
-            f'! Could not find .github/workflows/daily.yml — set cron "{cron}" there manually.',
-            fg=typer.colors.YELLOW,
-        )
 
     typer.secho("\nNext steps", fg=typer.colors.BLUE, bold=True)
     typer.echo("  1. Test the connection:   uv run radar test-notify")

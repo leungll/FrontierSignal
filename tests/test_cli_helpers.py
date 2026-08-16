@@ -1,7 +1,13 @@
 from typer.testing import CliRunner
 
 import radar.cli
-from radar.cli import _cron_for, _layout_sample, _secret_prompt, app
+from radar.cli import (
+    _cron_for,
+    _layout_sample,
+    _secret_prompt,
+    _weekly_cron_for,
+    app,
+)
 from radar.config import REPO_ROOT, settings
 
 
@@ -21,6 +27,17 @@ def test_cron_wraps_midnight():
 
 def test_cron_half_hour_timezone():
     assert _cron_for(7, 5.5) == "30 1 * * *"
+
+
+def test_weekly_cron_accounts_for_utc_day_shift():
+    # Monday 07:00 at UTC+8 -> Sunday 23:00 UTC
+    assert _weekly_cron_for(0, 7, 8) == "0 23 * * 0"
+    # Sunday 20:00 at UTC-5 -> Monday 01:00 UTC
+    assert _weekly_cron_for(6, 20, -5) == "0 1 * * 1"
+
+
+def test_weekly_cron_supports_half_hour_timezone():
+    assert _weekly_cron_for(0, 8, 5.5) == "30 2 * * 1"
 
 
 def test_workflows_expose_every_provider_and_notifier_setting():

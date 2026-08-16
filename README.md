@@ -91,7 +91,7 @@ The setup wizard has four steps:
 - **Step 1:** Choose a provider and set the filtering and summary models
 - **Step 2:** Choose a delivery channel and enter its connection details
 - **Step 3:** Choose English or Chinese reports
-- **Step 4:** Set the daily delivery time
+- **Step 4:** Set the daily and weekly delivery schedules
 
 The result is saved to `.env`. The wizard detects the local timezone and updates
 the GitHub Actions schedule. API keys and webhooks are hidden while you enter
@@ -246,8 +246,8 @@ of your own:
    - On the **Variables** tab, click **New repository variable**, then enter its name and value.
    - On the **Secrets** tab, click **New repository secret**, then enter sensitive values such as API keys and webhooks.
    - Click **Add variable** or **Add secret** to save each item.
-4. Commit and push [`.github/workflows/daily.yml`](./.github/workflows/daily.yml),
-   then test it once from **Actions → Frontier Signal Daily → Run workflow**.
+4. Commit and push the schedule changes in [`.github/workflows/`](./.github/workflows/),
+   then test once from **Actions → Frontier Signal Daily → Run workflow**.
 
 For example, Anthropic + Lark + English produces:
 
@@ -297,12 +297,11 @@ For example, OpenAI + Lark requires `OPENAI_API_KEY`, `LARK_WEBHOOK_URL` (plus
 Variables above. Names must match exactly; do not wrap values in quotes.
 
 Once the test succeeds, the daily report runs automatically and the weekly report
-summarizes the previous seven days. Change delivery times in
-[`daily.yml`](./.github/workflows/daily.yml) and
-[`weekly.yml`](./.github/workflows/weekly.yml).
+summarizes the previous seven days. To change either schedule later, run
+`uv run radar schedule` and push the workflow changes it generates.
 
-> GitHub Actions cannot reach Ollama at `localhost`. Use a publicly reachable
-> endpoint or a self-hosted runner.
+GitHub Actions cannot reach Ollama at `localhost`. Use a publicly reachable
+endpoint or a self-hosted runner.
 
 ---
 

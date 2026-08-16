@@ -81,7 +81,7 @@ uv run radar init
 - **Step 1：** 选择模型服务，并设置初筛模型和总结模型
 - **Step 2：** 选择推送渠道，并填写对应的连接信息
 - **Step 3：** 选择中文或英文报告
-- **Step 4：** 设置每天的发送时间
+- **Step 4：** 设置日报和周报的发送时间
 
 完成后，配置会保存到 `.env`。向导会自动读取本机时区并更新 GitHub Actions 的运行
 时间。输入 API key 或 webhook 时，终端不会显示内容；保存成功后会给出明确提示。
@@ -228,7 +228,7 @@ P0 / P1、逐条总结、今日趋势和阅读建议。
    - 在 **Variables** 页点击 **New repository variable**，填写变量名和值。
    - 在 **Secrets** 页点击 **New repository secret**，填写 API Key、Webhook 等敏感信息。
    - 每项填写后点击 **Add variable** 或 **Add secret** 保存。
-4. 提交并推送 [`.github/workflows/daily.yml`](./.github/workflows/daily.yml)，然后在 **Actions → Frontier Signal Daily → Run workflow** 试跑一次。
+4. 提交并推送 [`.github/workflows/`](./.github/workflows/) 中的时间配置修改，然后在 **Actions → Frontier Signal Daily → Run workflow** 试跑一次。
 
 例如，选择 Anthropic + Lark + 英文报告时，向导会输出：
 
@@ -276,10 +276,10 @@ Variables 需要同时填写名称和值；Secrets 使用上面显示的名称�
 例如选择 OpenAI + 飞书，只需添加 `OPENAI_API_KEY`、`LARK_WEBHOOK_URL`（启用签名校验时再添加
 `LARK_WEBHOOK_SECRET`），以及 Variables 表中的前五项。名称必须完全一致，值不要加引号。
 
-成功后，日报会每天自动发送；周报会汇总最近 7 天的内容。发送时间可在
-[`daily.yml`](./.github/workflows/daily.yml) 和 [`weekly.yml`](./.github/workflows/weekly.yml) 中修改。
+成功后，日报会每天自动发送，周报会汇总最近 7 天的内容。需要修改任一发送时间时，运行
+`uv run radar schedule`，再推送它生成的 workflow 修改即可。
 
-> 使用 Ollama 时，GitHub Actions 无法访问本机 `localhost`，请提供可公网访问的地址或使用 self-hosted runner。
+使用 Ollama 时，GitHub Actions 无法访问本机 `localhost`，请提供可公网访问的地址或使用 self-hosted runner。
 
 ---
 

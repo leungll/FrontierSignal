@@ -2,7 +2,7 @@ name: Frontier Signal Daily
 
 on:
   schedule:
-    # 23:00 UTC = 07:00 Asia/Shanghai. Change via `radar init` output.
+    # Configured by `radar init` or `radar schedule`; GitHub cron uses UTC.
     - cron: "0 16 * * *"
   workflow_dispatch: {}  # manual "Run workflow" button
 

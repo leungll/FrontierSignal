@@ -2,8 +2,8 @@ name: Frontier Signal Weekly
 
 on:
   schedule:
-    # Sunday 23:30 UTC = Monday 07:30 Asia/Shanghai — after Sunday's daily run.
-    - cron: "30 23 * * 0"
+    # Configured by `radar init` or `radar schedule`; GitHub cron uses UTC.
+    - cron: "0 16 * * 6"
   workflow_dispatch: {}
 
 permissions:
