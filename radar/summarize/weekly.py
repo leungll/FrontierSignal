@@ -29,16 +29,18 @@ the threads across the week that no single day made obvious.
 {lang}
 
 Return ONLY this JSON. Keys are fixed (English); each VALUE is markdown written in
-the target language. Cite items by their title when useful.
+the target language. The input gives every item an ID and URL. Use markdown links
+for every cited paper, blog, repository, or reading-plan item: [exact title](URL).
+Link the supporting items named in trends as well. Never invent a URL.
 {{
-  "trends": "Top 5 technical trends, ordered markdown list, one line each on why it matters",
-  "papers": "important papers this week, markdown list, one line each on the contribution",
-  "blogs": "important engineering blogs this week, markdown list",
-  "repos": "interesting OSS / framework moves, markdown list (if none, say so plainly)",
+  "trends": "5-item ordered list; bold trend name, concise analysis, linked evidence",
+  "papers": "bulleted markdown list; linked exact title, then one line on the contribution",
+  "blogs": "bulleted markdown list; linked exact title, then one line on why it matters",
+  "repos": "bulleted list; linked exact title and one-line summary; say if none",
   "direction": "industry direction, 2-4 sentences on what the signals point to",
   "overhyped": "what is overhyped, 1-3 sentences, be blunt",
   "deep_study": "what deserves deeper study, 1-3 sentences, name concrete topics",
-  "reading_plan": "next week's reading plan, markdown list of 3-5 concrete topics"
+  "reading_plan": "numbered markdown list of 3-5 concrete items; link every recommended source"
 }}
 No prose, no code fence."""
 
@@ -49,10 +51,10 @@ def _system(language: str) -> str:
 
 # (key, zh_heading, en_heading) — the card builder picks the heading by language.
 SECTION_SPECS = [
-    ("trends", "## Top 5 技术趋势", "## Top 5 technical trends"),
+    ("trends", "## 📈 Top 5 技术趋势", "## 📈 Top 5 technical trends"),
     ("papers", "## 📄 重要论文", "## 📄 Important papers"),
-    ("blogs", "## 重要工程博客", "## Engineering blogs"),
-    ("repos", "## 有趣的开源项目", "## Interesting OSS"),
+    ("blogs", "## 🛠️ 重要工程博客", "## 🛠️ Engineering blogs"),
+    ("repos", "## 💻 有趣的开源项目", "## 💻 Interesting OSS"),
     ("direction", "## 🧭 行业方向", "## 🧭 Industry direction"),
     ("overhyped", "## 🫧 什么被高估", "## 🫧 What's overhyped"),
     ("deep_study", "## 🔬 值得深入学习", "## 🔬 Worth deeper study"),
@@ -68,10 +70,26 @@ def sections(language: str) -> list[tuple[str, str]]:
 
 def _payload(rows: list[sqlite3.Row]) -> str:
     lines = []
-    for r in rows[:80]:  # cap tokens; rows are score-ordered so we keep the best
+    for index, r in enumerate(rows[:80]):  # score-ordered; keep the best
         s = (r["summary"] or "").strip().replace("\n", " ")[:200]
-        lines.append(f"- ({r['source_name']}) {r['title']} — {s}")
+        lines.append(
+            f"- [item-{index}] ({r['source_name']}) {r['title']}\n  URL: {r['url']}\n  Summary: {s}"
+        )
     return "\n".join(lines)
+
+
+def _link_known_titles(markdown: str, rows: list[sqlite3.Row]) -> str:
+    """Link exact source titles when the model omitted markdown link syntax."""
+    linked = markdown
+    titles = sorted(
+        ((str(r["title"]), str(r["url"])) for r in rows if r["title"] and r["url"]),
+        key=lambda pair: len(pair[0]),
+        reverse=True,
+    )
+    for title, url in titles:
+        if title in linked and f"[{title}]" not in linked:
+            linked = linked.replace(title, f"[{title}]({url})")
+    return linked
 
 
 def build(
@@ -90,7 +108,7 @@ def build(
             text = text.split("```")[1].removeprefix("json").strip()
         out = json.loads(text)
         log.info("weekly.done", sections=len(out), model=model)
-        return {k: str(v) for k, v in out.items()}
+        return {k: _link_known_titles(str(v), rows) for k, v in out.items()}
     except Exception as exc:  # fail open
         log.warning("weekly.failed", error=str(exc))
         return None

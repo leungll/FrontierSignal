@@ -174,28 +174,28 @@ def build_weekly_card(
     section_order is a list of (key, heading) pairs (radar.summarize.weekly.sections()).
     """
     lb = labels(language)
-    open_blocks: list[dict] = []
-    collapsible_md: list[str] = []
+    elements: list[dict] = []
+    open_sections = {"trends", "papers", "blogs", "repos"}
+    started_panels = False
 
-    # First four sections open, the rest collapsed (they're the reflective ones).
-    for idx, (key, heading) in enumerate(section_order):
+    # Keep the concrete weekly picks open. Give each reflective section its own
+    # panel so readers can jump directly to direction, hype, study, or planning.
+    for key, heading in section_order:
         body = sections.get(key, "").strip()
         if not body:
             continue
-        block_md = f"{heading}\n\n{_typo(body, language)}"
-        if idx < 4:
-            open_blocks.append({"tag": "markdown", "content": block_md})
+        title = heading.lstrip("# ")
+        content = _typo(body, language)
+        if key in open_sections:
+            if elements:
+                elements.append({"tag": "hr"})
+            elements.append({"tag": "markdown", "content": f"**{title}**"})
+            elements.append({"tag": "markdown", "content": content})
         else:
-            collapsible_md.append(block_md)
-
-    elements: list[dict] = []
-    for b in open_blocks:
-        elements.append(b)
-        elements.append({"tag": "hr"})
-    if elements and elements[-1].get("tag") == "hr":
-        elements.pop()
-    if collapsible_md:
-        elements.append(_collapsible(lb["weekly_more"], "\n\n".join(collapsible_md)))
+            if not started_panels and elements:
+                elements.append({"tag": "hr"})
+                started_panels = True
+            elements.append(_collapsible(title, content))
 
     return {
         "msg_type": "interactive",

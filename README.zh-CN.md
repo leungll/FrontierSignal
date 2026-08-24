@@ -91,14 +91,17 @@ uv run radar init
 ```bash
 uv run radar test-notify  # 向当前渠道发送连接测试
 uv run radar test-layout  # 向当前渠道发送排版示例
+uv run radar test-weekly  # 发送带链接的周报排版示例
 ```
 
-`test-layout` 使用内置示例内容，不抓取信息源，也不调用模型。还可以指定渠道或语言：
+`test-layout` 使用内置示例内容，不抓取信息源，也不调用模型；`test-weekly` 用于检查周报
+排版和链接。还可以指定渠道或语言：
 
 ```bash
 uv run radar test-layout --channel lark
 uv run radar test-layout --channel all
 uv run radar test-layout --language en
+uv run radar test-weekly --channel lark
 ```
 
 `all` 会跳过尚未完成配置的渠道，并在终端列出原因。
@@ -302,6 +305,7 @@ uv run ruff format --check .
 | 运行一次独立预览 | `uv run radar preview` |
 | 检查 Markdown 输出 | `uv run radar test-layout --channel console` |
 | 检查飞书卡片 | `uv run radar test-layout --channel lark` |
+| 检查飞书周报卡片 | `uv run radar test-weekly --channel lark` |
 | 查看各信息源的抓取状态 | `uv run radar sources` |
 
 项目通过小型接口隔离信息源、模型和推送渠道，新增能力不需要修改整条处理流程：

@@ -105,3 +105,11 @@ def test_layout_command_renders_console_sample():
     assert result.exit_code == 0
     assert "Agentic Configuration Management" in result.output
     assert "Layout sample sent to console" in result.output
+
+
+def test_weekly_layout_command_renders_console_sample_with_links():
+    result = CliRunner().invoke(app, ["test-weekly", "--channel", "console", "--language", "zh"])
+    assert result.exit_code == 0
+    assert "Top 5 技术趋势" in result.output
+    assert "https://example.com/frontier-signal/fragility" in result.output
+    assert "Weekly layout sample sent to console" in result.output

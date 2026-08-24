@@ -94,3 +94,29 @@ def test_daily_card_uses_plain_editorial_layout():
     assert elements[0]["content"] == "发现 24  ·  过滤 22  ·  精选 2"
     assert not any(e.get("tag") == "column_set" for e in elements)
     assert {e.get("element_id") for e in elements} >= {"trend_block", "reading_block"}
+
+
+def test_weekly_card_uses_section_headers_and_separate_panels():
+    sections = {
+        "trends": "1. trend",
+        "papers": "- [Paper](https://paper.example)",
+        "direction": "direction body",
+        "reading_plan": "1. [Read](https://read.example)",
+    }
+    order = [
+        ("trends", "## 📈 Top 5 技术趋势"),
+        ("papers", "## 📄 重要论文"),
+        ("direction", "## 🧭 行业方向"),
+        ("reading_plan", "## 📚 下周阅读计划"),
+    ]
+    card = lark.build_weekly_card(sections, order, "Week of 2026-08-22")
+    elements = card["card"]["body"]["elements"]
+    markdown = [e["content"] for e in elements if e.get("tag") == "markdown"]
+    panels = [e for e in elements if e.get("tag") == "collapsible_panel"]
+
+    assert "**📈 Top 5 技术趋势**" in markdown
+    assert any("[Paper](https://paper.example)" in block for block in markdown)
+    assert [p["header"]["title"]["content"] for p in panels] == [
+        "🧭 行业方向",
+        "📚 下周阅读计划",
+    ]

@@ -686,6 +686,91 @@ def _layout_sample(language: str) -> Report:
     )
 
 
+def _weekly_layout_sample(language: str) -> WeeklyReport:
+    """Fixed weekly report for renderer testing; no source or model calls."""
+    if language == "zh":
+        sections = {
+            "trends": (
+                "1. **Agent harness 成为一等抽象** — "
+                "[Seed](https://example.com/frontier-signal/seed) 与 "
+                "[Flue 2](https://example.com/frontier-signal/flue) 展示了可编程、可版本化的 harness。\n"
+                "2. **Agent memory 走向持久化** — "
+                "[StagedWorkspace](https://example.com/frontier-signal/workspace) 将版本控制引入知识工作流。\n"
+                "3. **评测开始关注协作过程** — 多 agent 系统不再只看任务完成率。\n"
+                "4. **Computer-use 从 demo 走向任务模型** — GUI 轨迹开始沉淀为可复用能力。\n"
+                "5. **推理基础设施继续优化** — serving 的重点仍是延迟、吞吐和成本。"
+            ),
+            "papers": (
+                "- [On the Fragility of Self-Improving Agents]"
+                "(https://example.com/frontier-signal/fragility) — 揭示自改进对任务顺序和方差的敏感性。\n"
+                "- [When Agents Coordinate](https://example.com/frontier-signal/coordination) — "
+                "为多 agent coding 引入协作度量。"
+            ),
+            "blogs": (
+                "- [Recursive Self-Improvement](https://example.com/frontier-signal/rsi) — "
+                "讨论 verifier 如何避免被优化过程反向利用。\n"
+                "- [How Much Memory Does Your Agent Need?]"
+                "(https://example.com/frontier-signal/memory) — 实证拆解 agent 的记忆需求。"
+            ),
+            "repos": (
+                "- [Seed](https://example.com/frontier-signal/seed) — 极简、可自我修改的 agent harness。\n"
+                "- [Mole](https://example.com/frontier-signal/mole) — 运行在终端中的 deep research agent。"
+            ),
+            "direction": "Agent 工程正在从能力展示转向可持续运行的系统设计，harness、memory 和 verifier 成为关键基础设施。",
+            "overhyped": "Recursive self-improvement 仍是研究议程，距离稳定、可交付的工程能力还有明显差距。",
+            "deep_study": "重点关注 verifier 的抗捕获设计、版本化工作区，以及多 agent 协作的可观测性。",
+            "reading_plan": (
+                "1. 精读 [On the Fragility of Self-Improving Agents]"
+                "(https://example.com/frontier-signal/fragility)。\n"
+                "2. 对比 [StagedWorkspace](https://example.com/frontier-signal/workspace) 与 agent memory 方案。\n"
+                "3. 阅读 [When Agents Coordinate](https://example.com/frontier-signal/coordination)。"
+            ),
+        }
+        date = "排版预览 · 截至 2026-08-22 的一周"
+    else:
+        sections = {
+            "trends": (
+                "1. **Agent harnesses become first-class abstractions** — "
+                "[Seed](https://example.com/frontier-signal/seed) and "
+                "[Flue 2](https://example.com/frontier-signal/flue) make harnesses programmable.\n"
+                "2. **Agent memory becomes durable** — versioned workspaces replace flat text stores.\n"
+                "3. **Evaluation moves into coordination** — multi-agent systems need process metrics.\n"
+                "4. **Computer use becomes reusable** — GUI traces are turning into task models.\n"
+                "5. **Inference remains an infrastructure problem** — latency and cost still dominate."
+            ),
+            "papers": (
+                "- [On the Fragility of Self-Improving Agents]"
+                "(https://example.com/frontier-signal/fragility) — Shows sensitivity to task order.\n"
+                "- [When Agents Coordinate](https://example.com/frontier-signal/coordination) — "
+                "Introduces coordination metrics for coding agents."
+            ),
+            "blogs": (
+                "- [Recursive Self-Improvement](https://example.com/frontier-signal/rsi) — "
+                "Examines verifier capture."
+            ),
+            "repos": (
+                "- [Seed](https://example.com/frontier-signal/seed) — A minimal self-modifying harness.\n"
+                "- [Mole](https://example.com/frontier-signal/mole) — A terminal research agent."
+            ),
+            "direction": "Agent engineering is shifting from capability demos to durable system design.",
+            "overhyped": "Recursive self-improvement remains a research agenda, not a reliable product capability.",
+            "deep_study": "Study verifier capture, versioned workspaces, and coordination observability.",
+            "reading_plan": (
+                "1. Read [On the Fragility of Self-Improving Agents]"
+                "(https://example.com/frontier-signal/fragility).\n"
+                "2. Compare durable memory architectures.\n"
+                "3. Review [When Agents Coordinate](https://example.com/frontier-signal/coordination)."
+            ),
+        }
+        date = "Layout preview · Week ending 2026-08-22"
+
+    return WeeklyReport(
+        date=date,
+        sections=sections,
+        order=weekly_summary.sections(language),
+    )
+
+
 @app.command()
 def sources() -> None:
     """List configured sources and their health."""
@@ -730,7 +815,12 @@ def weekly(
             raise typer.Exit(0)
 
         section_order = weekly_summary.sections(settings.language)
-        date_str = datetime.now(UTC).strftime("Week of %Y-%m-%d")
+        report_date = datetime.now(UTC).strftime("%Y-%m-%d")
+        date_str = (
+            f"截至 {report_date} 的一周"
+            if settings.language == "zh"
+            else f"Week ending {report_date}"
+        )
         report = WeeklyReport(date=date_str, sections=sections, order=section_order)
 
         if dry_run:
@@ -802,6 +892,53 @@ def test_layout(
             _layout_sample(selected_language), language=selected_language
         )
         typer.secho(f"Layout sample sent to {target} ✓", fg=typer.colors.GREEN)
+        sent += 1
+
+    if not sent:
+        raise typer.Exit(1)
+
+
+@app.command(name="test-weekly")
+def test_weekly(
+    channel: str | None = typer.Option(
+        None,
+        "--channel",
+        "-c",
+        help="lark, slack, discord, telegram, console, or all",
+    ),
+    language: str | None = typer.Option(
+        None,
+        "--language",
+        "-l",
+        help="Sample language: zh or en (defaults to configured language)",
+    ),
+) -> None:
+    """Send a fixed weekly sample to inspect links and channel layout."""
+    _setup_logging(False)
+    selected_channel = (channel or settings.notifier or "console").lower()
+    selected_language = (language or settings.language or "zh").lower()
+    valid_channels = ("lark", "slack", "discord", "telegram", "console")
+
+    if selected_channel not in (*valid_channels, "all"):
+        raise typer.BadParameter("channel must be lark, slack, discord, telegram, console, or all")
+    if selected_language not in ("zh", "en"):
+        raise typer.BadParameter("language must be zh or en")
+
+    targets = valid_channels if selected_channel == "all" else (selected_channel,)
+    sent = 0
+    for target in targets:
+        if not _channel_configured(target):
+            message = f"Skipped {target}: credentials are not configured in .env"
+            if selected_channel == "all":
+                typer.secho(message, fg=typer.colors.YELLOW)
+                continue
+            raise typer.BadParameter(message)
+
+        channel_settings = settings.model_copy(update={"notifier": target})
+        get_notifier(channel_settings).send_weekly(
+            _weekly_layout_sample(selected_language), language=selected_language
+        )
+        typer.secho(f"Weekly layout sample sent to {target} ✓", fg=typer.colors.GREEN)
         sent += 1
 
     if not sent:

@@ -102,15 +102,18 @@ them, and the wizard confirms when each value has been saved.
 ```bash
 uv run radar test-notify  # send a connection test to the configured channel
 uv run radar test-layout  # send a layout sample to the configured channel
+uv run radar test-weekly  # send a weekly layout sample with links
 ```
 
 `test-layout` uses built-in sample content, so it fetches no sources and calls no
-model. You can also target a channel or language explicitly:
+model. `test-weekly` does the same for the weekly report. You can also target a
+channel or language explicitly:
 
 ```bash
 uv run radar test-layout --channel lark
 uv run radar test-layout --channel all
 uv run radar test-layout --language en
+uv run radar test-weekly --channel lark
 ```
 
 `all` skips channels without credentials and reports each skip in the terminal.
@@ -325,6 +328,7 @@ rendering, run the full test suite and inspect real output with:
 | Run an isolated preview | `uv run radar preview` |
 | Inspect Markdown output | `uv run radar test-layout --channel console` |
 | Inspect the Lark card | `uv run radar test-layout --channel lark` |
+| Inspect the weekly Lark card | `uv run radar test-weekly --channel lark` |
 | Inspect source health | `uv run radar sources` |
 
 Small interfaces isolate sources, models, and delivery channels, so extensions
