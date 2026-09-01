@@ -144,7 +144,7 @@ def build_card(
                 "content": (
                     lb["dead_head"]
                     + "\n"
-                    + ", ".join(f"`{s}`" for s in stats.dead_sources)
+                    + "\n".join(f"- {_typo(s, language)}" for s in stats.dead_sources)
                     + "\n\n"
                     + lb["dead_note"]
                 ),

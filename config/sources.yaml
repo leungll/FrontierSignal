@@ -111,7 +111,8 @@ sources:
   # ---------- Research labs & systems / infra ----------
   - id: bair
     name: Berkeley AI Research (BAIR)
-    url: https://bair.berkeley.edu/blog/feed.xml
+    # Official GitHub Pages mirror; the Berkeley-hosted endpoint is prone to timeouts.
+    url: https://bairblog.github.io/feed.xml
     authority: 0.85
 
   - id: pytorch

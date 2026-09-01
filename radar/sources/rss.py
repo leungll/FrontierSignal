@@ -22,7 +22,7 @@ from radar.models import RawItem, Source
 
 log = structlog.get_logger()
 
-USER_AGENT = "Frontier-Signal/0.1 (+https://github.com/ll-leung/ai-research-radar)"
+USER_AGENT = "Frontier-Signal/0.1 (+https://github.com/leungll/FrontierSignal)"
 
 
 class FetchError(Exception):
@@ -96,9 +96,7 @@ async def fetch_source(
         if not link or not title:
             continue
 
-        published = _to_datetime(
-            entry.get("published_parsed") or entry.get("updated_parsed")
-        )
+        published = _to_datetime(entry.get("published_parsed") or entry.get("updated_parsed"))
         # Undated entries are kept: some feeds (e.g. Hugging Face) omit dates,
         # and the DB dedupes by URL anyway.
         if published and published < since:
@@ -143,10 +141,11 @@ async def fetch_all(
                 try:
                     return await fetch_source(client, conn, src, since=since, cap=cap)
                 except Exception as exc:  # isolation: never let one feed kill the run
-                    fails = db.save_source_failure(conn, src.id, str(exc)[:300])
-                    log.warning("source.failed", source=src.id, error=str(exc), streak=fails)
+                    error = str(exc)[:300]
+                    fails = db.save_source_failure(conn, src.id, error)
+                    log.warning("source.failed", source=src.id, error=error, streak=fails)
                     if fails >= 3:
-                        dead.append(src.id)
+                        dead.append(f"{src.id}: {error}")
                     return []
 
         for result in await asyncio.gather(*(one(s) for s in sources)):

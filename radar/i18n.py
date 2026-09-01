@@ -27,7 +27,7 @@ LABELS: dict[str, dict[str, str]] = {
         "trend_head": "**今日趋势**",
         "reading_head": "**30 分钟阅读推荐**",
         "dead_head": "**失效源**",
-        "dead_note": "_连续 3 次以上失败 — 请检查 feed URL。_",
+        "dead_note": "_连续 3 次运行失败；每次运行均已自动重试。_",
         "weekly_more": "**更多：方向 · 高估 · 深入学习 · 阅读计划**",
     },
     "en": {
@@ -44,7 +44,7 @@ LABELS: dict[str, dict[str, str]] = {
         "trend_head": "**Today's trend**",
         "reading_head": "**If you have 30 minutes**",
         "dead_head": "**Dead sources**",
-        "dead_note": "_3+ consecutive failures — check the feed URL._",
+        "dead_note": "_Failed in 3+ consecutive runs; each run was automatically retried._",
         "weekly_more": "**More: direction · overhyped · study · reading plan**",
     },
 }

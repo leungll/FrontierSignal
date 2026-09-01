@@ -40,6 +40,15 @@ def test_render_markdown_english():
     assert "Must-read" in md and "Today's" in md
 
 
+def test_render_markdown_includes_specific_source_failure():
+    report = _report()
+    report.stats.dead_sources = ["bair: ReadTimeout: request timed out"]
+    md = render_markdown(report, "en")
+    assert "Dead sources" in md
+    assert "bair: ReadTimeout: request timed out" in md
+    assert "automatically retried" in md
+
+
 def test_weekly_markdown():
     wr = WeeklyReport(date="d", sections={"trends": "trend body"}, order=[("trends", "## Trends")])
     md = render_weekly_markdown(wr, "en")

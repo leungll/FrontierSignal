@@ -76,6 +76,10 @@ def render_markdown(report: Report, language: str = "zh") -> str:
         out.append("\n" + lb["reading_head"])
         out.append(_typo(report.reading.strip(), language))
 
+    if report.stats.dead_sources:
+        failures = "\n".join(f"- {_typo(source, language)}" for source in report.stats.dead_sources)
+        out.append(f"\n{lb['dead_head']}\n\n{failures}\n\n{lb['dead_note']}")
+
     return "\n\n".join(out)
 
 

@@ -67,6 +67,19 @@ def test_empty_report_renders():
     assert card["card"]["schema"] == "2.0"
 
 
+def test_dead_source_notice_includes_specific_error():
+    stats = RunStats(
+        found=1,
+        new=1,
+        reported=1,
+        dead_sources=["bair: ReadTimeout: request timed out"],
+    )
+    card = lark.build_card(_items()[:1], stats, "d")
+    payload = json.dumps(card, ensure_ascii=False)
+    assert "bair: ReadTimeout: request timed out" in payload
+    assert "每次运行均已自动重试" in payload
+
+
 def test_connection_test_card_has_no_report_stats():
     card = lark.build_test_card("en")
     payload = json.dumps(card)
