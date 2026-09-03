@@ -67,6 +67,9 @@ class Item(RawItem):
 
     # Filled by the Opus summarizer (radar.summarize.item).
     why_it_matters: str = ""
+    # Best-effort article text fetched only for final report candidates. This is
+    # transient enrichment for summarization and is not persisted in SQLite.
+    full_text: str = ""
 
     # Filled by the embedding/cluster stage (radar.pipeline.cluster).
     cluster_id: int | None = None

@@ -80,6 +80,31 @@ def test_dead_source_notice_includes_specific_error():
     assert "每次运行均已自动重试" in payload
 
 
+def test_daily_card_keeps_detailed_summary():
+    item = make_item("Detailed", summary="A" * 600, url="https://example.com/detailed")
+    card = lark.build_card([item], RunStats(found=1, new=1, reported=1), "d")
+    payload = json.dumps(card)
+    assert "A" * 600 in payload
+
+
+def test_daily_card_visually_separates_summary_and_why():
+    item = make_item(
+        "Structured",
+        summary="核心方法。关键结果。适用限制。",
+        url="https://example.com/structured",
+        priority="P0",
+    )
+    item.why_it_matters = "这会影响工程选型。"
+    card = lark.build_card([item], RunStats(found=1, new=1, reported=1), "d")
+    block = next(
+        element["content"]
+        for element in card["card"]["body"]["elements"]
+        if element.get("tag") == "markdown" and "Structured" in element.get("content", "")
+    )
+    assert "**内容摘要**\n- 核心方法。\n- 关键结果。\n- 适用限制。" in block
+    assert "\n\n**为什么重要**\n这会影响工程选型。" in block
+
+
 def test_connection_test_card_has_no_report_stats():
     card = lark.build_test_card("en")
     payload = json.dumps(card)

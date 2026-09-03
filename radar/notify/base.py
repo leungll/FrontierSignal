@@ -9,6 +9,7 @@ plain markdown — no collapsing, no fancy layout, just the content.
 
 from __future__ import annotations
 
+import re
 from typing import Protocol, runtime_checkable
 
 from radar.i18n import labels
@@ -29,17 +30,30 @@ def _typo(text: str, language: str) -> str:
     return _cn_normalize(text) if language == "zh" else text
 
 
+def format_summary(text: str, language: str) -> str:
+    """Render a summary as compact bullets, including legacy prose summaries."""
+    text = _typo(text.strip(), language)
+    if not text:
+        return ""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) > 1 and all(re.match(r"^(?:[-*]|\d+[.)])\s+", line) for line in lines):
+        return "\n".join(lines)
+
+    pattern = r"(?<=[。！？])\s*" if language == "zh" else r"(?<=[.!?])\s+"
+    sentences = [part.strip() for part in re.split(pattern, text) if part.strip()]
+    if len(sentences) < 2:
+        return text
+    return "\n".join(f"- {sentence}" for sentence in sentences[:4])
+
+
 def _item_block(item, why_label: str, also_label: str, index: int, language: str) -> str:
     lines = [f"**{index}. {item.title}**", f"{item.source_name} · {item.url}"]
-    summary = _typo(item.summary.strip(), language)
+    summary = format_summary(item.summary, language)
     if summary:
-        lines.append(summary)
+        lines.extend(["", f"**{labels(language)['summary']}**", summary])
     if item.why_it_matters.strip():
         why = _typo(item.why_it_matters.strip(), language)
-        if language == "zh":
-            lines.append(f"**{why_label}**  {why}")
-        else:
-            lines.append(f"**{why_label}:** {why}")
+        lines.extend(["", f"**{why_label}**", why])
     if item.merged_sources:
         also = " · ".join(f"{s['name']}: {s['url']}" for s in item.merged_sources[:4])
         lines.append(f"_{also_label}:_ {also}")

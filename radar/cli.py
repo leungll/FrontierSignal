@@ -20,7 +20,7 @@ from radar.models import Item, RunStats
 from radar.notify.factory import get_notifier
 from radar.pipeline import cluster, embed, llm_filter, score
 from radar.report import Report, WeeklyReport
-from radar.sources import arxiv, hackernews, rss
+from radar.sources import arxiv, fulltext, hackernews, rss
 from radar.summarize import digest
 from radar.summarize import item as summarize_item
 from radar.summarize import weekly as weekly_summary
@@ -384,6 +384,16 @@ def run(
         # Split into P0 / P1 by importance (relevance + authority + coverage).
         selected = score.assign_priority(
             selected, interests.p0_count, cluster.cluster_sizes(relevant)
+        )
+
+        # Fetch full article text only for final candidates. Feed snippets are
+        # often too thin to support a useful stand-alone engineering summary.
+        asyncio.run(
+            fulltext.enrich(
+                selected,
+                timeout=settings.http_timeout,
+                concurrency=min(settings.max_concurrency, 4),
+            )
         )
 
         # The strong model summarizes only the handful that made the cut.

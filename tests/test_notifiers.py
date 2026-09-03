@@ -3,7 +3,7 @@ import respx
 
 from radar.config import Settings
 from radar.models import RunStats
-from radar.notify.base import render_markdown, render_weekly_markdown
+from radar.notify.base import format_summary, render_markdown, render_weekly_markdown
 from radar.notify.factory import get_notifier
 from radar.notify.webhook_channels import (
     DiscordNotifier,
@@ -33,6 +33,27 @@ def test_render_markdown_has_sections_and_links():
     assert "P0 one" in md and "https://a" in md
     assert "P1 two" in md
     assert "今日趋势" in md and "阅读推荐" in md
+
+
+def test_long_chinese_summary_is_split_into_bullets():
+    summary = "第一点介绍核心方法。第二点给出实验结果。第三点说明适用限制。"
+    rendered = format_summary(summary, "zh")
+    assert rendered == ("- 第一点介绍核心方法。\n- 第二点给出实验结果。\n- 第三点说明适用限制。")
+
+
+def test_legacy_prose_summary_is_limited_to_four_bullets():
+    rendered = format_summary("第一点。第二点。第三点。第四点。第五点。", "zh")
+    assert rendered.count("\n") == 3
+    assert "第四点。" in rendered
+    assert "第五点。" not in rendered
+
+
+def test_daily_markdown_separates_summary_and_why():
+    report = _report()
+    report.items[0].why_it_matters = "影响架构选择。"
+    md = render_markdown(report, "zh")
+    assert "**内容摘要**\n" in md
+    assert "**为什么重要**\n影响架构选择。" in md
 
 
 def test_render_markdown_english():

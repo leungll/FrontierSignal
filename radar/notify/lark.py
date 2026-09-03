@@ -20,6 +20,7 @@ import structlog
 
 from radar.i18n import labels
 from radar.models import Item, RunStats
+from radar.notify.base import format_summary
 from radar.notify.cn_typography import normalize as _cn_normalize
 
 log = structlog.get_logger()
@@ -40,9 +41,9 @@ def sign(timestamp: str, secret: str) -> str:
 
 
 def _md_item(item: Item, lb: dict[str, str], language: str, index: int) -> str:
-    summary = _typo(item.summary.strip(), language)
-    if len(summary) > 280:
-        summary = summary[:277].rstrip() + "…"
+    summary = format_summary(item.summary, language)
+    if len(summary) > 1_200:
+        summary = summary[:1_197].rstrip() + "…"
 
     meta = item.source_name
     if item.llm_relevance is not None:
@@ -50,14 +51,13 @@ def _md_item(item: Item, lb: dict[str, str], language: str, index: int) -> str:
 
     lines = [
         f"**{index}. [{item.title}]({item.url})**",
-        meta,
+        f"_{meta}_",
     ]
     if summary:
-        lines.append(summary)
+        lines.extend(["", f"**{lb['summary']}**", summary])
     if item.why_it_matters.strip():
         why = _typo(item.why_it_matters.strip(), language)
-        separator = "  " if language == "zh" else " "
-        lines.append(f"**{lb['why']}**{separator}{why}")
+        lines.extend(["", f"**{lb['why']}**", why])
     if item.merged_sources:
         also = " · ".join(f"[{s['name']}]({s['url']})" for s in item.merged_sources[:4])
         lines.append(f"_{lb['also_seen']}:_ {also}")
