@@ -45,7 +45,8 @@ class Settings(BaseSettings):
     filter_model: str = ""
     summary_model: str = ""
     # Below this LLM relevance score (0-10) an item is dropped from the report.
-    llm_min_relevance: int = 6
+    # 7 = "solid and clearly relevant"; 6 let in too much tangential material.
+    llm_min_relevance: int = 7
     # Cap how many keyword-survivors we spend Claude tokens on per run.
     llm_max_candidates: int = 40
     # Sources at/above this authority get a "fast lane": every post is judged by

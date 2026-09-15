@@ -33,6 +33,10 @@ class Interests(BaseModel):
     max_report_items: int = 8
     floor_report_items: int = 3
     p0_count: int = 3
+    # Max "landmark" items (major results scored high via the landmark override but
+    # off the day-to-day engineering topics) allowed in one report. Keeps landmarks
+    # a supplement to the agent/engineering feed instead of crowding it out.
+    max_landmark_items: int = 2
     # Per-source cap on how many items may appear in one report, keyed by
     # source_id. Prevents a high-volume source (arxiv, hackernews) from crowding
     # out sparser but valuable sources (engineering blogs). Sources not listed are
@@ -64,6 +68,13 @@ class Item(RawItem):
     # Filled by the Claude filter stage (radar.pipeline.llm_filter).
     llm_relevance: int | None = None  # 0-10; None = not yet judged
     llm_reason: str = ""
+    # How the item earned its relevance, per the Claude filter:
+    #   "engineering" — on-topic frontier AI engineering (agents, infra, evals, …)
+    #   "landmark"    — a major result/milestone worth reading even if off-topic
+    #   "other"       — neither; kept only if it clears the relevance bar
+    # Selection uses this to cap landmarks so they supplement, not replace, the
+    # engineering feed.
+    llm_category: str = "engineering"
 
     # Filled by the Opus summarizer (radar.summarize.item).
     why_it_matters: str = ""

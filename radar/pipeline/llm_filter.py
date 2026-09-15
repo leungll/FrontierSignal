@@ -42,6 +42,9 @@ NOT INTERESTED IN (score low, near 0):
 - Startup funding, valuations, acquisitions, IPOs
 - Product announcements, consumer AI apps, general AI news
 - AI investment news, AI politics/regulation, listicles, marketing
+- AI alignment/safety philosophy, AI ethics debates, AI-and-academia/society
+  think-pieces, and abstract "where is AI heading" commentary — UNLESS it is
+  concrete engineering (e.g. a technical eval methodology, a monitoring system).
 
 LANDMARK OVERRIDE (score high even if it's off the engineering topics above):
   If an item is a genuine MILESTONE from a frontier lab or top researcher — a major
@@ -49,13 +52,20 @@ LANDMARK OVERRIDE (score high even if it's off the engineering topics above):
   in capability, a significant new model/system, or a clear industry turning point —
   score it 8-10. A landmark is worth the engineer's attention even when it doesn't
   match their day-to-day engineering keywords. This is NOT a license for hype:
-  ordinary product launches, incremental papers, and marketing do NOT qualify.
+  ordinary product launches, incremental papers, opinion/think-pieces, and marketing
+  do NOT qualify.
 
 Score 0-10 for how much THIS engineer should read it:
   8-10 = frontier engineering insight, OR a genuine landmark, they'd regret missing
   6-7  = solid, relevant, worth a look
   3-5  = tangential or shallow
   0-2  = noise / off-topic / marketing
+
+Also CLASSIFY each item with "cat":
+  "engineering" = on-topic frontier AI engineering (the STRONGLY INTERESTED list)
+  "landmark"    = scored high ONLY via the LANDMARK OVERRIDE, not day-to-day
+                  engineering (e.g. an AI-solved math result, a capability milestone)
+  "other"       = anything else
 """
 
 _SYSTEM = (
@@ -65,7 +75,8 @@ _SYSTEM = (
     " between Chinese and English/numbers (如「agent 一致性」), use full-width"
     " Chinese punctuation, and don't stack terms with「+」.\n"
     "Return ONLY a JSON array, one object per item, same order as given:\n"
-    '[{"i": <index>, "score": <0-10 int>, "reason": "<最多约20字>"}]\n'
+    '[{"i": <index>, "score": <0-10 int>, "cat": "engineering|landmark|other",'
+    ' "reason": "<最多约20字>"}]\n'
     "No prose, no code fence."
 )
 
@@ -78,16 +89,26 @@ def _payload(items: list[Item]) -> str:
     return "\n\n".join(rows)
 
 
-def _parse(text: str, n: int) -> dict[int, tuple[int, str]]:
+_CATEGORIES = {"engineering", "landmark", "other"}
+
+
+def _parse(text: str, n: int) -> dict[int, tuple[int, str, str]]:
     """Tolerant parse: strip a stray fence, clamp scores, ignore junk rows."""
     text = text.strip()
     if text.startswith("```"):
         text = text.split("```")[1].removeprefix("json").strip()
-    out: dict[int, tuple[int, str]] = {}
+    out: dict[int, tuple[int, str, str]] = {}
     for row in json.loads(text):
         i = int(row["i"])
         if 0 <= i < n:
-            out[i] = (max(0, min(10, int(row["score"]))), str(row.get("reason", ""))[:120])
+            cat = str(row.get("cat", "engineering"))
+            if cat not in _CATEGORIES:
+                cat = "engineering"
+            out[i] = (
+                max(0, min(10, int(row["score"]))),
+                str(row.get("reason", ""))[:120],
+                cat,
+            )
     return out
 
 
@@ -151,7 +172,7 @@ def apply(
 
     for idx, it in enumerate(candidates):
         if idx in scores:
-            it.llm_relevance, it.llm_reason = scores[idx]
+            it.llm_relevance, it.llm_reason, it.llm_category = scores[idx]
 
     judged = sum(1 for i in candidates if i.llm_relevance is not None)
     log.info("llm_filter.done", judged=judged, model=model)

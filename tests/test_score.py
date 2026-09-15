@@ -36,6 +36,35 @@ def test_source_cap_is_hard_wall():
     assert len(sel) == 6
 
 
+def test_landmark_cap_reserves_slots_for_engineering():
+    # 5 strong landmarks + 4 engineering items; cap landmarks at 2 so engineering
+    # content isn't crowded out even though landmarks score higher.
+    items = [
+        make_item(f"lm{i}", llm_relevance=9, llm_category="landmark") for i in range(5)
+    ]
+    items += [
+        make_item(f"eng{i}", llm_relevance=7, llm_category="engineering")
+        for i in range(4)
+    ]
+    sel = select_for_report(items, _interests(max_landmark_items=2), llm_min_relevance=6)
+    c = Counter(i.llm_category for i in sel)
+    assert c["landmark"] == 2  # capped
+    assert c["engineering"] == 4  # the rest of the slots go to engineering
+
+
+def test_landmark_cap_relaxes_to_reach_floor():
+    # Only landmarks available on a quiet day: cap relaxes so the report isn't empty.
+    items = [
+        make_item(f"lm{i}", llm_relevance=9, llm_category="landmark") for i in range(5)
+    ]
+    sel = select_for_report(
+        items,
+        _interests(max_landmark_items=2, floor_report_items=3),
+        llm_min_relevance=6,
+    )
+    assert len(sel) == 3  # floor honored despite the landmark cap
+
+
 def test_cap_floor_relaxation_prevents_empty():
     items = [make_item(f"a{i}", source_id="arxiv", llm_relevance=8) for i in range(15)]
     sel = select_for_report(
