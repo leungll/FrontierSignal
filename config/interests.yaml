@@ -3,7 +3,12 @@
 
 # Matched against title + summary. Each hit adds `weight` to the score.
 topics:
-  - { pattern: "(?i)\\b(ai )?agents?\\b",                       weight: 1.0 }
+  # Narrowed: bare "agent" also fires on AI-safety/philosophy chatter ("why agents
+  # lie/cheat"). Require an engineering context word near "agent" (either order,
+  # within a sentence-ish window) so we match agent *engineering*, not agent
+  # *discourse*. The eng-word list covers building, running, and tooling agents.
+  - { pattern: "(?i)\\bagent(ic)?\\b.{0,60}\\b(runtime|loop|harness|framework|orchestrat|tool|memory|build|deploy|production|serving|eval|architecture|ide|coding|sdk|rollout|workflow|pipeline|infra)\\b", weight: 1.2 }
+  - { pattern: "(?i)\\b(runtime|loop|harness|framework|orchestrat|tool|memory|build|deploy|production|serving|eval|architecture|ide|coding|sdk|rollout|workflow|pipeline|infra)\\b.{0,60}\\bagent(ic)?s?\\b", weight: 1.0 }
   - { pattern: "(?i)\\bagent(ic)? (runtime|loop|harness|framework)\\b", weight: 1.2 }
   - { pattern: "(?i)\\b(llm|model) serving\\b",                 weight: 1.2 }
   - { pattern: "(?i)\\binference (engine|optimi|latency|throughput)", weight: 1.2 }
@@ -31,6 +36,10 @@ kill_list:
     - "(?i)\\b(top|best) \\d+\\b|\\bultimate guide\\b|\\byou should know\\b"
     - "(?i)\\bai (regulation|policy|bill|act|executive order|lawsuit)\\b"
     - "(?i)\\b(hiring|we're hiring|join our team|careers)\\b"
+    # AI-safety/alignment philosophy & society think-pieces are not engineering.
+    # (A concrete eval methodology still gets in — it won't match these phrasings.)
+    - "(?i)\\bai (ethics|alignment debate|existential|doom|sentience|consciousness)\\b"
+    - "(?i)\\b(future|end) of (work|academia|science|humanity)\\b"
   domains:
     - techcrunch.com
     - venturebeat.com
@@ -40,6 +49,10 @@ kill_list:
 min_score: 1.0
 # Max items in a daily report.
 max_report_items: 8
+# Max "landmark" items (major but off-topic results, e.g. an AI-solved math
+# problem) per report. Keeps landmarks a supplement so agent/engineering content
+# stays the bulk of the feed. Relaxed only if needed to reach floor_report_items.
+max_landmark_items: 2
 # Even on a quiet day, report at least this many (top-scored).
 floor_report_items: 3
 # How many of the selected items are marked P0 (the must-reads at the top). The

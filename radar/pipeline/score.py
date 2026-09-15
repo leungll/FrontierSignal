@@ -108,7 +108,11 @@ def assign_priority(
 
 
 def _apply_source_caps(
-    ranked: list[Item], caps: dict[str, int], limit: int, floor: int
+    ranked: list[Item],
+    caps: dict[str, int],
+    limit: int,
+    floor: int,
+    max_landmark: int | None = None,
 ) -> list[Item]:
     """Fill up to `limit` slots from `ranked` (already sorted best-first),
     honoring per-source caps as a HARD wall.
@@ -119,6 +123,11 @@ def _apply_source_caps(
     out to 8 with more papers. A source-diverse short report beats a paper-heavy
     long one.
 
+    `max_landmark` applies the same hard-ceiling logic to "landmark"-category items
+    so major-but-off-topic results (an AI math result, a capability milestone) stay
+    a supplement and never crowd out the engineering feed. Like source caps, it is
+    relaxed only to reach the floor.
+
     The one exception is the floor: if honoring caps leaves us below `floor`
     (a very quiet day where almost nothing but one capped source had content),
     we relax the caps just enough to reach `floor`, because an empty-ish report is
@@ -126,6 +135,7 @@ def _apply_source_caps(
     """
     chosen: list[Item] = []
     used: dict[str, int] = {}
+    landmarks = 0
     picked_ids: set[int] = set()
 
     for item in ranked:
@@ -134,9 +144,17 @@ def _apply_source_caps(
         cap = caps.get(item.source_id)
         if cap is not None and used.get(item.source_id, 0) >= cap:
             continue
+        if (
+            max_landmark is not None
+            and item.llm_category == "landmark"
+            and landmarks >= max_landmark
+        ):
+            continue
         chosen.append(item)
         picked_ids.add(id(item))
         used[item.source_id] = used.get(item.source_id, 0) + 1
+        if item.llm_category == "landmark":
+            landmarks += 1
 
     # Floor relaxation only: never let caps push us below the floor.
     if len(chosen) < floor:
@@ -178,6 +196,7 @@ def select_for_report(
             interests.source_caps,
             interests.max_report_items,
             interests.floor_report_items,
+            max_landmark=interests.max_landmark_items,
         )
     # Nothing cleared the bar — floor with the top-ranked alive items (caps still
     # apply so the floor stays diverse too).
