@@ -10,6 +10,7 @@ API: https://hn.algolia.com/api  (search_by_date, numericFilters on points/time)
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 
 import httpx
@@ -22,6 +23,20 @@ log = structlog.get_logger()
 ENDPOINT = "https://hn.algolia.com/api/v1/search_by_date"
 SOURCE_ID = "hackernews"
 SOURCE_NAME = "Hacker News"
+
+# HN gives us no article body — only vote/comment metrics. We store that as the
+# item summary so there's *something*, but it is a placeholder, not real content:
+# the summarizer must treat it as "body unavailable" and not parrot it back.
+_METRICS_RE = re.compile(r"\d+\s+points\s+·\s+\d+\s+comments on Hacker News\.")
+
+
+def metrics_summary(points: int, comments: int) -> str:
+    return f"{points} points · {comments} comments on Hacker News."
+
+
+def is_metrics_placeholder(text: str) -> bool:
+    """True if `text` is (only) the HN metrics line, i.e. carries no real body."""
+    return bool(_METRICS_RE.fullmatch(text.strip()))
 
 
 async def fetch(
@@ -59,7 +74,7 @@ async def fetch(
                 source_name=SOURCE_NAME,
                 title=title,
                 url=url,
-                summary=f"{points} points · {comments} comments on Hacker News.",
+                summary=metrics_summary(points, comments),
                 published_at=published,
             )
         )

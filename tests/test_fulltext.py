@@ -42,3 +42,50 @@ def test_enrich_attaches_html_text_to_selected_item():
 
     assert "Technical paragraph 0" in item.full_text
     assert len(item.full_text) >= 200
+
+
+def test_enrich_retries_once_on_transient_status():
+    item = make_item("Engine", url="https://example.com/flaky")
+    paragraphs = "".join(
+        f"<p>Technical paragraph {i} with enough useful detail.</p>" for i in range(8)
+    )
+
+    with respx.mock:
+        route = respx.get("https://example.com/flaky")
+        route.side_effect = [
+            httpx.Response(503),  # transient — should trigger one retry
+            httpx.Response(
+                200, text=f"<article>{paragraphs}</article>",
+                headers={"content-type": "text/html"},
+            ),
+        ]
+        asyncio.run(fulltext.enrich([item], timeout=1))
+
+    assert route.call_count == 2
+    assert "Technical paragraph 0" in item.full_text
+
+
+def test_enrich_does_not_retry_permanent_404():
+    item = make_item("Gone", url="https://example.com/missing")
+    with respx.mock:
+        route = respx.get("https://example.com/missing").mock(
+            return_value=httpx.Response(404)
+        )
+        asyncio.run(fulltext.enrich([item], timeout=1))
+
+    assert route.call_count == 1  # no wasted retry on a permanent miss
+    assert item.full_text == ""
+
+
+def test_enrich_skips_thin_page():
+    item = make_item("Thin", url="https://example.com/thin")
+    with respx.mock:
+        respx.get("https://example.com/thin").mock(
+            return_value=httpx.Response(
+                200, text="<article><p>Too short.</p></article>",
+                headers={"content-type": "text/html"},
+            )
+        )
+        asyncio.run(fulltext.enrich([item], timeout=1))
+
+    assert item.full_text == ""  # below MIN_BODY_CHARS, not attached

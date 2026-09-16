@@ -16,6 +16,7 @@ an outage still produces a (less precise) report instead of nothing.
 from __future__ import annotations
 
 import json
+import re
 
 import structlog
 
@@ -91,15 +92,44 @@ def _payload(items: list[Item]) -> str:
 
 _CATEGORIES = {"engineering", "landmark", "other"}
 
+# One judged object: {"i": N, "score": N, "cat": "...", "reason": "..."}. Used to
+# salvage complete rows when the array is truncated (see _parse).
+_OBJ_RE = re.compile(r"\{[^{}]*\}")
 
-def _parse(text: str, n: int) -> dict[int, tuple[int, str, str]]:
-    """Tolerant parse: strip a stray fence, clamp scores, ignore junk rows."""
+
+def _rows(text: str) -> list[dict]:
+    """Parse the model's JSON array, tolerating a truncated tail.
+
+    The happy path is a clean `json.loads`. But the filter batches ~40 items into
+    one call, and if the model hits the token ceiling mid-array the JSON is
+    unterminated — a single `json.loads` then throws and we'd lose every judgment,
+    including the dozens of complete rows before the cut. So on failure we fall back
+    to extracting each complete `{...}` object individually and keep those.
+    """
     text = text.strip()
     if text.startswith("```"):
         text = text.split("```")[1].removeprefix("json").strip()
+    try:
+        data = json.loads(text)
+        return data if isinstance(data, list) else []
+    except json.JSONDecodeError:
+        rows: list[dict] = []
+        for m in _OBJ_RE.finditer(text):
+            try:
+                rows.append(json.loads(m.group()))
+            except json.JSONDecodeError:
+                continue  # the truncated final object — skip it
+        return rows
+
+
+def _parse(text: str, n: int) -> dict[int, tuple[int, str, str]]:
+    """Tolerant parse: strip a stray fence, clamp scores, ignore junk rows."""
     out: dict[int, tuple[int, str, str]] = {}
-    for row in json.loads(text):
-        i = int(row["i"])
+    for row in _rows(text):
+        try:
+            i = int(row["i"])
+        except (KeyError, TypeError, ValueError):
+            continue
         if 0 <= i < n:
             cat = str(row.get("cat", "engineering"))
             if cat not in _CATEGORIES:
@@ -161,9 +191,15 @@ def apply(
 
     candidates = _pick_candidates(items, max_candidates, trusted_authority)
 
+    # Size the output budget to the batch: each judged row is a small JSON object
+    # plus a ~20-char Chinese reason, ~90 tokens with headroom. A fixed 2048 ceiling
+    # truncated the array for full (~40-item) runs, which dropped the whole semantic
+    # pass to the keyword fallback. Cap so a pathological batch can't blow up cost.
+    max_tokens = min(8192, 256 + 90 * len(candidates))
+
     try:
         text = client.complete(
-            system=_SYSTEM, user=_payload(candidates), model=model, max_tokens=2048
+            system=_SYSTEM, user=_payload(candidates), model=model, max_tokens=max_tokens
         )
         scores = _parse(text, len(candidates))
     except Exception as exc:  # fail open — a report beats no report
