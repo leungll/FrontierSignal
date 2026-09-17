@@ -27,6 +27,26 @@ class _Client:
         )
 
 
+def test_summary_returned_as_list_is_joined_not_reprd():
+    # The model sometimes returns "summary" as a JSON array of bullets. It must be
+    # joined with newlines, never str()-ed into a Python repr ("['- a', '\\n- b']").
+    class _ListClient:
+        available = True
+
+        def complete(self, *, system, user, model, max_tokens):
+            return json.dumps([{
+                "i": 0,
+                "summary": ["- First bullet.", "\n- Second bullet.", "- Third."],
+                "why": "Consequence.",
+            }])
+
+    it = make_item("Title", summary="feed excerpt with plenty of length " * 10)
+    item_summary.apply([it], client=_ListClient(), model="model", language="en")
+
+    assert it.summary == "- First bullet.\n- Second bullet.\n- Third."
+    assert "['" not in it.summary and "\\n" not in it.summary
+
+
 class _NullClient:
     available = False
 

@@ -106,8 +106,21 @@ def _parse(text: str, n: int) -> dict[int, tuple[str, str]]:
     for row in json.loads(text):
         i = int(row["i"])
         if 0 <= i < n:
-            out[i] = (str(row.get("summary", ""))[:1_500], str(row.get("why", ""))[:700])
+            out[i] = (_as_text(row.get("summary", ""))[:1_500], _as_text(row.get("why", ""))[:700])
     return out
+
+
+def _as_text(value: object) -> str:
+    """Coerce a model field to a markdown string.
+
+    The prompt asks for "summary" as a string of bullet lines, but the model
+    sometimes returns a JSON array of bullets instead. `str([...])` would render
+    the Python repr ("['- a', '\\n- b']") verbatim into the report, so join list
+    items with newlines instead. Scalars pass through as `str`.
+    """
+    if isinstance(value, list):
+        return "\n".join(_as_text(v).strip() for v in value if str(v).strip())
+    return str(value)
 
 
 def _honest_fallback(items: list[Item], no_body: set[int], language: str) -> None:
