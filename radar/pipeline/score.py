@@ -77,19 +77,34 @@ def _rank_key(item: Item) -> tuple[float, float]:
     return (item.llm_relevance if item.llm_relevance is not None else -1, item.score)
 
 
+# An item we couldn't fetch real text for is worth less as a *must-read*: its
+# summary is just "full text unavailable" from the title. Penalize importance so
+# such items sink below any readable item, keeping P0 for entries the reader can
+# actually act on. Sized to outweigh the relevance/authority spread (~0-11.5) so a
+# body-less item never outranks one with a body on relevance alone.
+NO_BODY_PENALTY = 100.0
+
+
 def assign_priority(
-    items: list[Item], p0_count: int, cluster_sizes: dict[int, int] | None = None
+    items: list[Item],
+    p0_count: int,
+    cluster_sizes: dict[int, int] | None = None,
+    no_body: set[int] | None = None,
 ) -> list[Item]:
     """Score importance and split into P0 / P1. Mutates and returns `items`.
 
     importance = relevance (0-10, primary signal)
                + authority bonus (trusted sources matter more)
                + cross-source coverage bonus (a story clustered across many
-                 sources is a bigger deal than a lone paper).
+                 sources is a bigger deal than a lone paper)
+               − a large penalty when we have no article body to summarize, so
+                 title-only entries never take a P0 (must-read) slot.
 
-    The top `p0_count` by importance become P0; the rest P1.
+    The top `p0_count` by importance become P0; the rest P1. `no_body` holds the
+    ids of items whose full text couldn't be fetched (computed after enrichment).
     """
     cluster_sizes = cluster_sizes or {}
+    no_body = no_body or set()
     for it in items:
         rel = it.llm_relevance if it.llm_relevance is not None else it.score
         coverage = cluster_sizes.get(it.cluster_id, 1) if it.cluster_id is not None else 1
@@ -97,7 +112,8 @@ def assign_priority(
             rel
             + 1.5 * it.authority          # 0.75-1.5 nudge for trusted sources
             + 0.8 * (coverage - 1)        # +0.8 per extra source covering the story
-            + 0.5 * len(it.merged_sources),  # merged dups are also coverage
+            + 0.5 * len(it.merged_sources)  # merged dups are also coverage
+            - (NO_BODY_PENALTY if id(it) in no_body else 0.0),
             3,
         )
 

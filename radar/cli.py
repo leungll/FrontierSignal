@@ -381,11 +381,6 @@ def run(
             relevant, interests, llm_min_relevance=settings.llm_min_relevance
         )
 
-        # Split into P0 / P1 by importance (relevance + authority + coverage).
-        selected = score.assign_priority(
-            selected, interests.p0_count, cluster.cluster_sizes(relevant)
-        )
-
         # Fetch full article text only for final candidates. Feed snippets are
         # often too thin to support a useful stand-alone engineering summary.
         asyncio.run(
@@ -394,6 +389,14 @@ def run(
                 timeout=settings.http_timeout,
                 concurrency=min(settings.max_concurrency, 4),
             )
+        )
+
+        # Split into P0 / P1 by importance. Done AFTER enrichment so items we
+        # couldn't fetch text for (JS-only pages, paywalls) are penalized and can't
+        # take a must-read P0 slot with a title-only "full text unavailable" note.
+        no_body = {id(i) for i in selected if not summarize_item.has_body(i)}
+        selected = score.assign_priority(
+            selected, interests.p0_count, cluster.cluster_sizes(relevant), no_body=no_body
         )
 
         # The strong model summarizes only the handful that made the cut.

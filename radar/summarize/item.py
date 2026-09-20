@@ -71,7 +71,7 @@ def _system(language: str) -> str:
     return _SYSTEM_TMPL.format(lang=prompt_lang(language))
 
 
-def _has_body(it: Item) -> bool:
+def has_body(it: Item) -> bool:
     """Whether we have real article text to summarize (vs. only a stub).
 
     full_text is real content when present. Otherwise we fall back to the RSS/feed
@@ -90,7 +90,7 @@ def _has_body(it: Item) -> bool:
 def _payload(items: list[Item]) -> str:
     rows = []
     for idx, it in enumerate(items):
-        if _has_body(it):
+        if has_body(it):
             body = (it.full_text or it.summary).strip().replace("\n", " ")[:12_000]
         else:
             body = "[body unavailable]"
@@ -147,7 +147,7 @@ def apply(items: list[Item], *, client: LLMClient, model: str, language: str = "
 
     # Snapshot which items lack a real body BEFORE the model rewrites summaries, so
     # the fallback can tell "model wrote a real summary" from "stub still there".
-    no_body = {id(it) for it in items if not _has_body(it)}
+    no_body = {id(it) for it in items if not has_body(it)}
 
     if not client.available:
         _honest_fallback(items, no_body, language)

@@ -84,3 +84,19 @@ def test_priority_split_and_coverage_bonus():
     p0 = [i.title for i in ranked if i.priority == "P0"]
     assert len(p0) == 2
     assert "b" in p0  # trusted + rel 9 tops
+
+
+def test_no_body_items_sink_below_readable_ones():
+    # A high-relevance item we couldn't fetch text for must not take a P0 slot over
+    # lower-relevance items that have a real body.
+    high_no_body = make_item("nobody", llm_relevance=10)
+    low_a = make_item("a", llm_relevance=6)
+    low_b = make_item("b", llm_relevance=5)
+    items = [high_no_body, low_a, low_b]
+
+    ranked = assign_priority(items, p0_count=2, no_body={id(high_no_body)})
+    p0 = [i.title for i in ranked if i.priority == "P0"]
+
+    assert "nobody" not in p0          # penalized out of must-read despite rel 10
+    assert set(p0) == {"a", "b"}       # the readable items take P0
+    assert ranked[-1].title == "nobody"  # sinks to the bottom
