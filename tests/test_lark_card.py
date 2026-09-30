@@ -9,12 +9,12 @@ def _items():
     items = [
         make_item(
             "P0 item",
-            llm_relevance=9,
+            llm_score=9,
             priority="P0",
             summary="内容 summary",
             url="https://a",
         ),
-        make_item("P1 item", llm_relevance=7, priority="P1", summary="another", url="https://b"),
+        make_item("P1 item", llm_score=7, priority="P1", summary="another", url="https://b"),
     ]
     items[0].why_it_matters = "重要原因"
     return items
@@ -34,7 +34,7 @@ def test_card_is_schema_2_with_p0_and_collapsible_p1():
         if e.get("tag") == "markdown" and e.get("content", "").startswith("**1. [")
     ]
     assert len(p0_blocks) == 1
-    assert "Src · relevance 9/10" in p0_blocks[0]["content"]
+    assert "Src · score 9.0/10" in p0_blocks[0]["content"]
     assert "**为什么重要**" in p0_blocks[0]["content"]
     assert "<text_tag" not in p0_blocks[0]["content"]
 

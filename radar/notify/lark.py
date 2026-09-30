@@ -46,8 +46,8 @@ def _md_item(item: Item, lb: dict[str, str], language: str, index: int) -> str:
         summary = summary[:1_197].rstrip() + "…"
 
     meta = item.source_name
-    if item.llm_relevance is not None:
-        meta += f" · relevance {item.llm_relevance}/10"
+    if item.llm_score is not None:
+        meta += f" · score {item.llm_score:.1f}/10"
 
     lines = [
         f"**{index}. [{item.title}]({item.url})**",

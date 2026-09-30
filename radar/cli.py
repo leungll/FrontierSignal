@@ -20,7 +20,7 @@ from radar.models import Item, RunStats
 from radar.notify.factory import get_notifier
 from radar.pipeline import cluster, embed, llm_filter, score
 from radar.report import Report, WeeklyReport
-from radar.sources import arxiv, fulltext, hackernews, rss
+from radar.sources import anthropic, arxiv, fulltext, hackernews, rss
 from radar.summarize import digest
 from radar.summarize import item as summarize_item
 from radar.summarize import weekly as weekly_summary
@@ -222,8 +222,8 @@ def init() -> None:
         )
         key = _secret_prompt("Anthropic API key", optional=True)
         lines.append(f"ANTHROPIC_API_KEY={key}")
-        filter_default = "claude-haiku-4-5-20251001"
-        summary_default = "claude-opus-4-8"
+        filter_default = "claude-sonnet-5-5"
+        summary_default = "claude-opus-5-5"
     else:
         typer.secho(
             "Create or copy a key: https://platform.openai.com/api-keys",
@@ -351,25 +351,30 @@ def run(
         fresh = [i for i in scored if i.canonical_url not in seen]
         db.insert_items(conn, fresh)
 
-        # LLM filter: the cheap model judges relevance on the keyword-survivors.
+        # LLM filter: the cheap model judges every curated post plus the best
+        # keyword-scored firehose items (arXiv, HN) on relevance/impact/depth.
         llm_client = get_client(settings)
         alive = [i for i in fresh if not i.is_killed]
         llm_filter.apply(
             alive,
             client=llm_client,
             model=settings.filter_model,
-            max_candidates=settings.llm_max_candidates,
-            trusted_authority=settings.trusted_authority,
+            firehose_budget=interests.firehose_budget,
+            weights=interests.score_weights,
         )
 
-        # Embed the relevant survivors (local bge-small), then semantic-dedupe and
-        # cluster. Dedup merges the same story from multiple sources; clusters feed
-        # P0/P1 and the trend section. Only items Claude judged are embedded — no
-        # point spending CPU on items that won't reach the report.
-        judged = [i for i in alive if i.llm_relevance is not None]
-        if judged:  # Claude ran — embed only items that cleared the bar
-            relevant = [i for i in judged if i.llm_relevance >= settings.llm_min_relevance]
-        else:  # Claude skipped/failed — fall back to keyword threshold
+        # Embed the report-worthy survivors (local bge-small), then semantic-dedupe
+        # and cluster. Dedup merges the same story from multiple sources; clusters
+        # feed P0/P1 and the trend section. Only items that could make the report
+        # (eligible and above the floor bar) are embedded.
+        judged = [i for i in alive if i.llm_score is not None]
+        if judged:  # LLM ran — keep items that could make the report
+            relevant = [
+                i
+                for i in judged
+                if score.is_eligible(i, interests) and i.llm_score >= interests.floor_min_score
+            ]
+        else:  # LLM skipped/failed — fall back to keyword threshold
             relevant = [i for i in alive if i.score >= interests.min_score]
         cache = db.load_embeddings(conn, [embed.content_hash(i) for i in relevant])
         vectors = embed.embed_items(relevant, cache)
@@ -377,9 +382,7 @@ def run(
         relevant = cluster.dedupe_semantic(relevant, vectors)
         cluster.cluster_topics(relevant, vectors)
 
-        selected = score.select_for_report(
-            relevant, interests, llm_min_relevance=settings.llm_min_relevance
-        )
+        selected = score.select_for_report(relevant, interests)
 
         # Fetch full article text only for final candidates. Feed snippets are
         # often too thin to support a useful stand-alone engineering summary.
@@ -481,8 +484,9 @@ def preview() -> None:
 
 
 async def _fetch_everything(conn, sources, since):
-    """Run RSS + arXiv + HN concurrently. arXiv/HN failures are isolated (they
-    return [] on error) and don't count toward dead_sources."""
+    """Run RSS + arXiv + HN + Anthropic featured concurrently. The API/page
+    fetchers' failures are isolated (they return [] on error and log a warning)
+    and don't count toward dead_sources."""
     import httpx
 
     raws, dead = await rss.fetch_all(
@@ -500,8 +504,9 @@ async def _fetch_everything(conn, sources, since):
         follow_redirects=True,
     ) as client:
         api_results = await asyncio.gather(
-            arxiv.fetch(client, since=since, cap=settings.per_source_cap),
+            arxiv.fetch(client, since=since),
             hackernews.fetch(client, since=since, cap=settings.per_source_cap),
+            anthropic.fetch(client, since=since),
         )
     for result in api_results:
         raws.extend(result)
@@ -518,8 +523,9 @@ def _preview(items, stats, date_str: str) -> str:
     ]
     for i, item in enumerate(items, 1):
         rel = (
-            f"rel {item.llm_relevance}/10"
-            if item.llm_relevance is not None
+            f"{item.llm_score:.1f}/10 {item.llm_type}"
+            f" (rel {item.llm_relevance} imp {item.llm_impact} dep {item.llm_depth})"
+            if item.llm_score is not None
             else f"kw {item.score:g}"
         )
         lines.append(f"{i}. [{rel}] {item.title}")
@@ -685,7 +691,7 @@ def _layout_sample(language: str) -> Report:
                 url=f"https://example.com/frontier-signal/{index}",
                 summary=summary,
                 canonical_url=f"https://example.com/frontier-signal/{index}",
-                llm_relevance=relevance,
+                llm_score=relevance,
                 why_it_matters=why,
                 priority="P0" if index <= 2 else "P1",
             )

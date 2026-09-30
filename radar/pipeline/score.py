@@ -11,7 +11,7 @@ from functools import lru_cache
 from urllib.parse import urlparse
 
 from radar.canonical import canonicalize
-from radar.models import Interests, Item, RawItem, Source
+from radar.models import Interests, Item, RawItem, ScoreWeights, Source
 
 
 @lru_cache(maxsize=256)
@@ -62,26 +62,64 @@ def score_all(
 
 
 def dedupe_in_batch(items: list[Item]) -> list[Item]:
-    """Collapse same-canonical-URL items within one run, keeping the highest score."""
+    """Collapse same-canonical-URL items within one run, keeping the highest score,
+    then the most authoritative source.
+
+    The authority tiebreak matters when an aggregator links straight to a
+    publisher's post: an HN submission of "anthropic.com/claude-sonnet-5-5" and
+    Anthropic's own entry share a URL and (with no keyword hits) a score of 0.
+    Keeping the HN copy would leave the launch to compete for HN's small judging
+    budget instead of being judged as a curated post."""
     best: dict[str, Item] = {}
     for item in items:
         prev = best.get(item.canonical_url)
-        if prev is None or item.score > prev.score:
+        if prev is None or (item.score, item.authority) > (prev.score, prev.authority):
             best[item.canonical_url] = item
     return list(best.values())
 
 
+def item_score(rel: int, imp: int, dep: int, weights: ScoreWeights) -> float:
+    """Combine the LLM's three judged dimensions into one 0-10 score.
+
+    A weighted sum, not a product: an item can earn its place either by being a
+    big development (a frontier model launch: high impact, modest depth) or by
+    being substantive engineering (a detailed write-up: modest impact, high
+    depth). Relevance carries the most weight because the digest is for AI
+    engineering; the relevance *gate* lives in `is_eligible`.
+    """
+    return round(
+        weights.relevance * rel + weights.impact * imp + weights.depth * dep, 2
+    )
+
+
+def is_eligible(item: Item, interests: Interests) -> bool:
+    """Whether a judged item may appear in the report at all (before ranking).
+
+    Must be on-topic enough (relevance >= min_relevance) — except field-level
+    milestones (impact >= milestone_impact), which are worth knowing about even
+    when they're off the engineering topics. Types capped at 0 are excluded.
+    """
+    if item.llm_score is None or item.llm_relevance is None or item.llm_impact is None:
+        return False
+    if interests.type_caps.get(item.llm_type) == 0:
+        return False
+    return (
+        item.llm_relevance >= interests.min_relevance
+        or item.llm_impact >= interests.milestone_impact
+    )
+
+
 def _rank_key(item: Item) -> tuple[float, float]:
-    """Rank by Claude relevance first, keyword score as tiebreak. Unjudged items
-    (llm_relevance is None) sort last via -1."""
-    return (item.llm_relevance if item.llm_relevance is not None else -1, item.score)
+    """Rank by the LLM's combined score first, keyword score as tiebreak.
+    Unjudged items (llm_score is None) sort last via -1."""
+    return (item.llm_score if item.llm_score is not None else -1, item.score)
 
 
 # An item we couldn't fetch real text for is worth less as a *must-read*: its
 # summary is just "full text unavailable" from the title. Penalize importance so
 # such items sink below any readable item, keeping P0 for entries the reader can
-# actually act on. Sized to outweigh the relevance/authority spread (~0-11.5) so a
-# body-less item never outranks one with a body on relevance alone.
+# actually act on. Sized to outweigh the score/authority/coverage spread (~0-15)
+# so a body-less item never outranks one with a body.
 NO_BODY_PENALTY = 100.0
 
 
@@ -93,7 +131,7 @@ def assign_priority(
 ) -> list[Item]:
     """Score importance and split into P0 / P1. Mutates and returns `items`.
 
-    importance = relevance (0-10, primary signal)
+    importance = LLM combined score (0-10, primary signal)
                + authority bonus (trusted sources matter more)
                + cross-source coverage bonus (a story clustered across many
                  sources is a bigger deal than a lone paper)
@@ -106,10 +144,10 @@ def assign_priority(
     cluster_sizes = cluster_sizes or {}
     no_body = no_body or set()
     for it in items:
-        rel = it.llm_relevance if it.llm_relevance is not None else it.score
+        base = it.llm_score if it.llm_score is not None else it.score
         coverage = cluster_sizes.get(it.cluster_id, 1) if it.cluster_id is not None else 1
         it.importance = round(
-            rel
+            base
             + 1.5 * it.authority          # 0.75-1.5 nudge for trusted sources
             + 0.8 * (coverage - 1)        # +0.8 per extra source covering the story
             + 0.5 * len(it.merged_sources)  # merged dups are also coverage
@@ -123,54 +161,45 @@ def assign_priority(
     return ranked
 
 
-def _apply_source_caps(
+def _apply_caps(
     ranked: list[Item],
-    caps: dict[str, int],
+    source_caps: dict[str, int],
+    type_caps: dict[str, int],
     limit: int,
     floor: int,
-    max_landmark: int | None = None,
 ) -> list[Item]:
     """Fill up to `limit` slots from `ranked` (already sorted best-first),
-    honoring per-source caps as a HARD wall.
+    honoring per-source and per-type caps as a HARD wall.
 
-    Caps are a hard ceiling per source: arXiv can contribute at most its cap, full
-    stop. This is deliberate — the whole point is that arXiv's 50 papers never
-    dominate the report, so we'd rather ship a tighter 6-item report than pad it
-    out to 8 with more papers. A source-diverse short report beats a paper-heavy
-    long one.
+    Source caps stop a high-volume source (arXiv's papers, HN's threads) from
+    dominating; type caps do the same for a kind of content (papers, launches,
+    news, opinion), whichever source it comes from. We'd rather ship a tighter,
+    balanced 6-item report than pad it to 8 with more of the same.
 
-    `max_landmark` applies the same hard-ceiling logic to "landmark"-category items
-    so major-but-off-topic results (an AI math result, a capability milestone) stay
-    a supplement and never crowd out the engineering feed. Like source caps, it is
-    relaxed only to reach the floor.
-
-    The one exception is the floor: if honoring caps leaves us below `floor`
-    (a very quiet day where almost nothing but one capped source had content),
+    The one exception is the floor: if honoring caps leaves us below `floor` (a
+    very quiet day where almost everything came from one capped source or type),
     we relax the caps just enough to reach `floor`, because an empty-ish report is
-    worse than a temporarily source-heavy one.
+    worse than a temporarily lopsided one. A type capped at 0 is never relaxed —
+    callers exclude those before ranking.
     """
     chosen: list[Item] = []
-    used: dict[str, int] = {}
-    landmarks = 0
+    by_source: dict[str, int] = {}
+    by_type: dict[str, int] = {}
     picked_ids: set[int] = set()
 
     for item in ranked:
         if len(chosen) >= limit:
             break
-        cap = caps.get(item.source_id)
-        if cap is not None and used.get(item.source_id, 0) >= cap:
+        cap = source_caps.get(item.source_id)
+        if cap is not None and by_source.get(item.source_id, 0) >= cap:
             continue
-        if (
-            max_landmark is not None
-            and item.llm_category == "landmark"
-            and landmarks >= max_landmark
-        ):
+        tcap = type_caps.get(item.llm_type) if item.llm_score is not None else None
+        if tcap is not None and by_type.get(item.llm_type, 0) >= tcap:
             continue
         chosen.append(item)
         picked_ids.add(id(item))
-        used[item.source_id] = used.get(item.source_id, 0) + 1
-        if item.llm_category == "landmark":
-            landmarks += 1
+        by_source[item.source_id] = by_source.get(item.source_id, 0) + 1
+        by_type[item.llm_type] = by_type.get(item.llm_type, 0) + 1
 
     # Floor relaxation only: never let caps push us below the floor.
     if len(chosen) < floor:
@@ -183,42 +212,53 @@ def _apply_source_caps(
     return chosen
 
 
-def select_for_report(
-    items: list[Item], interests: Interests, llm_min_relevance: int = 6
-) -> list[Item]:
+def select_for_report(items: list[Item], interests: Interests) -> list[Item]:
     """Rank and cut.
 
-    When Claude has scored items, its relevance is the primary gate: only items at
-    or above `llm_min_relevance` qualify. Items Claude never judged, or a run where
-    Claude was skipped/failed, fall back to the keyword `min_score` threshold so
-    the pipeline still produces a report.
+    When the LLM has judged items, its combined score is the gate: eligible items
+    (see `is_eligible`) scoring >= min_report_score qualify. If fewer than
+    floor_report_items qualify, the best eligible items down to floor_min_score
+    fill the gap — a quiet day still gets a short report of the best available,
+    never junk. A run where the LLM was skipped/failed falls back to the keyword
+    `min_score` threshold so the pipeline still produces a report.
 
-    Per-source caps (interests.source_caps) then keep any single high-volume source
-    from crowding out the rest. Floor guarantees a quiet day reports something.
+    Source and type caps then keep the report balanced.
     """
     alive = sorted(
         (i for i in items if not i.is_killed), key=_rank_key, reverse=True
     )
 
-    judged = [i for i in alive if i.llm_relevance is not None]
-    if judged:
-        above = [i for i in judged if i.llm_relevance >= llm_min_relevance]
-    else:  # Claude skipped/failed — degrade to keyword threshold
+    judged = [i for i in alive if i.llm_score is not None]
+    if not judged:  # LLM skipped/failed — degrade to keyword threshold
         above = [i for i in alive if i.score >= interests.min_score]
-
-    if above:
-        return _apply_source_caps(
-            above,
+        # Nothing cleared the bar — floor with the top-ranked alive items.
+        limit = interests.max_report_items if above else interests.floor_report_items
+        return _apply_caps(
+            above or alive,
             interests.source_caps,
-            interests.max_report_items,
+            {},
+            limit,
             interests.floor_report_items,
-            max_landmark=interests.max_landmark_items,
         )
-    # Nothing cleared the bar — floor with the top-ranked alive items (caps still
-    # apply so the floor stays diverse too).
-    return _apply_source_caps(
-        alive,
+
+    eligible = [i for i in judged if is_eligible(i, interests)]
+    above = [i for i in eligible if i.llm_score >= interests.min_report_score]
+    chosen = _apply_caps(
+        above,
         interests.source_caps,
-        interests.floor_report_items,
-        interests.floor_report_items,
+        interests.type_caps,
+        interests.max_report_items,
+        0,
     )
+    if len(chosen) < interests.floor_report_items:
+        # Re-pick from everything down to the floor bar: best-first, caps honored
+        # where possible and relaxed only to reach the floor.
+        pool = [i for i in eligible if i.llm_score >= interests.floor_min_score]
+        chosen = _apply_caps(
+            pool,
+            interests.source_caps,
+            interests.type_caps,
+            interests.floor_report_items,
+            interests.floor_report_items,
+        )
+    return chosen

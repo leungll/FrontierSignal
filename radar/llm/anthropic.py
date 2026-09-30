@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import structlog
+
+log = structlog.get_logger()
+
 
 class AnthropicClient:
     def __init__(self, api_key: str) -> None:
@@ -26,4 +30,9 @@ class AnthropicClient:
             system=system,
             messages=[{"role": "user", "content": user}],
         )
-        return resp.content[0].text
+        # Newer models (Sonnet 5.5, Opus 5.5) think by default, so the response can
+        # open with a thinking block; the answer is the concatenated text blocks.
+        # Thinking tokens also count toward max_tokens — surface truncation.
+        if resp.stop_reason == "max_tokens":
+            log.warning("anthropic.max_tokens", model=model, max_tokens=max_tokens)
+        return "".join(b.text for b in resp.content if b.type == "text")

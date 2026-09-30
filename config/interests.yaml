@@ -45,25 +45,59 @@ kill_list:
     - venturebeat.com
     - businessinsider.com
 
-# Items scoring below this are archived but not reported.
+# ---------------------------------------------------------------------------
+# Scoring. Keyword `topics` above only pre-filter the firehose sources and act as
+# the fallback when no LLM is configured. The real ranking is the LLM's three
+# independent 0-10 judgments (see radar/pipeline/llm_filter.py for the rubric):
+#   relevance — how directly it bears on building/running/evaluating AI systems
+#   impact    — how much the underlying development changes what practitioners
+#               know or can do (judged on the development, not the post's length)
+#   depth     — how much concrete technical substance the text carries
+# combined as score = weights · (relevance, impact, depth). So an item earns its
+# place either by being a big development (a frontier model launch) or by being
+# substantive engineering (a detailed write-up) — no per-topic special cases.
+score_weights: { relevance: 0.45, impact: 0.35, depth: 0.20 }
+# Items at/above this combined score qualify for the daily report.
+min_report_score: 6.0
+# Gate: must be at least this relevant to AI engineering...
+min_relevance: 5
+# ...unless it is a field-level milestone (impact >= this), e.g. an AI-solved
+# open math problem, which is worth knowing even when off-topic.
+milestone_impact: 9
+
+# Keyword-only threshold, used when the LLM is unavailable.
 min_score: 1.0
 # Max items in a daily report.
 max_report_items: 8
-# Max "landmark" items (major but off-topic results, e.g. an AI-solved math
-# problem) per report. Keeps landmarks a supplement so agent/engineering content
-# stays the bulk of the feed. Relaxed only if needed to reach floor_report_items.
-max_landmark_items: 2
-# Even on a quiet day, report at least this many (top-scored).
+# Even on a quiet day, report at least this many — taking the best eligible items
+# down to floor_min_score, never below it (a short report beats padding).
 floor_report_items: 3
+floor_min_score: 5.0
 # How many of the selected items are marked P0 (the must-reads at the top). The
 # rest become P1 (rendered in a collapsible section). Fewer = more selective P0.
 p0_count: 3
 
+# Balance caps: at most this many items of one kind per report, so no single
+# kind of content crowds out the rest. Relaxed only to reach the floor.
+# Content types (judged by the LLM): release | research | engineering | news |
+# opinion | promo. `engineering` (technical write-ups) is deliberately uncapped.
+# 0 excludes a type outright.
+type_caps:
+  research: 3     # papers are valuable but must not dominate
+  release: 3      # launches matter, but a launch-heavy day shouldn't be all launches
+  news: 1
+  opinion: 1
+  promo: 0        # marketing, contests, case studies, partnerships
+
 # Per-source caps: max items a single source may contribute to one report.
-# Stops high-volume sources (arXiv, Hacker News) from crowding out sparser but
-# high-signal engineering blogs. Sources not listed here are uncapped. If capped
-# sources leave slots empty (e.g. blogs were quiet), the report backfills by rank
-# so it still reaches max_report_items — the cap is a preference, not a hard wall.
+# Sources not listed here are uncapped.
 source_caps:
-  arxiv: 3        # papers are valuable but must not dominate
+  arxiv: 3
   hackernews: 2   # community signal, keep it a garnish
+
+# High-volume sources and how many of their items (best keyword score first) the
+# LLM judges per run. Every other source is curated and low-volume, so ALL of its
+# posts are judged — keywords never decide whether a curated post is seen.
+firehose_budget:
+  arxiv: 25
+  hackernews: 15

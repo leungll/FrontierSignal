@@ -206,9 +206,13 @@ The main path follows the content itself: frontier labs, researcher blogs, arXiv
 and Hacker News enter shared Source Adapters for concurrent fetching,
 normalization, and URL deduplication before reaching the intelligence layer.
 
-The intelligence layer applies rule filtering, LLM relevance evaluation,
-semantic deduplication, topic clustering, and combined ranking before producing
-P0/P1 items, summaries, the day's trend, and a reading plan.
+The intelligence layer applies rule filtering, LLM evaluation, semantic
+deduplication, topic clustering, and combined ranking before producing P0/P1
+items, summaries, the day's trend, and a reading plan. The LLM judges each item on
+three anchored 0-10 dimensions (relevance, impact, depth) plus a content type;
+code combines them into one weighted score, gates on relevance (field-level
+milestones excepted), and applies per-type and per-source caps. Weights,
+thresholds, and caps live in `config/interests.yaml`.
 
 The model layer exposes filtering, summarization, and embeddings through one
 interface. The pipeline does not depend on a provider, so selecting Anthropic,
@@ -257,8 +261,8 @@ For example, Anthropic + Lark + English produces:
 ```text
 GitHub Actions repository variables
   LLM_PROVIDER=anthropic
-  FILTER_MODEL=claude-haiku-4-5-20251001
-  SUMMARY_MODEL=claude-opus-4-8
+  FILTER_MODEL=claude-sonnet-5-5
+  SUMMARY_MODEL=claude-opus-5-5
   NOTIFIER=lark
   LANGUAGE=en
 
@@ -276,8 +280,8 @@ above and the secret value you entered during `radar init`.
 | Name | Example value |
 |---|---|
 | `LLM_PROVIDER` | `anthropic` or `openai` |
-| `FILTER_MODEL` | `claude-haiku-4-5-20251001` or `gpt-4o-mini` |
-| `SUMMARY_MODEL` | `claude-opus-4-8` or `gpt-4o` |
+| `FILTER_MODEL` | `claude-sonnet-5-5` or `gpt-4o-mini` |
+| `SUMMARY_MODEL` | `claude-opus-5-5` or `gpt-4o` |
 | `NOTIFIER` | `lark`, `slack`, `discord`, `telegram`, or `console` |
 | `LANGUAGE` | `zh` for Chinese or `en` for English |
 | `OPENAI_BASE_URL` | Only for OpenAI-compatible services; omit for OpenAI itself |

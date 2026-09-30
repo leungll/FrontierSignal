@@ -16,9 +16,9 @@ def _orthonormal_pair():
 
 
 def test_semantic_dedup_merges_and_keeps_best_rank():
-    a = make_item("vLLM 1.0 release", source_name="blog", llm_relevance=9)
-    b = make_item("vLLM version 1.0 out", source_name="hn", llm_relevance=7)
-    c = make_item("Grothendieck paper", source_name="arxiv", llm_relevance=8)
+    a = make_item("vLLM 1.0 release", source_name="blog", llm_score=9)
+    b = make_item("vLLM version 1.0 out", source_name="hn", llm_score=7)
+    c = make_item("Grothendieck paper", source_name="arxiv", llm_score=8)
     v1, v2 = _orthonormal_pair()
     vectors = {content_hash(a): v1, content_hash(b): v1, content_hash(c): v2}
 

@@ -26,7 +26,7 @@ CLUSTER_THRESHOLD = 0.62  # cosine >= this ⇒ same topic (looser than dedup)
 
 
 def _rank_key(item: Item) -> tuple[float, float]:
-    return (item.llm_relevance if item.llm_relevance is not None else -1, item.score)
+    return (item.llm_score if item.llm_score is not None else -1, item.score)
 
 
 def dedupe_semantic(

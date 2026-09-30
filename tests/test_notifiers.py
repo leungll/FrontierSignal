@@ -20,8 +20,8 @@ def _report():
         date="2026-08-12",
         stats=RunStats(found=100, new=100, reported=2),
         items=[
-            make_item("P0 one", llm_relevance=9, priority="P0", summary="内容", url="https://a"),
-            make_item("P1 two", llm_relevance=7, priority="P1", summary="more", url="https://b"),
+            make_item("P0 one", llm_score=9, priority="P0", summary="内容", url="https://a"),
+            make_item("P1 two", llm_score=7, priority="P1", summary="more", url="https://b"),
         ],
         trend="agent 更成熟。",
         reading="**#1** — 读它。",

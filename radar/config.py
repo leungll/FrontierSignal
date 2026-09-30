@@ -44,15 +44,8 @@ class Settings(BaseSettings):
     # summaries. `radar init` sets both for the selected provider.
     filter_model: str = ""
     summary_model: str = ""
-    # Below this LLM relevance score (0-10) an item is dropped from the report.
-    # 7 = "solid and clearly relevant"; 6 let in too much tangential material.
-    llm_min_relevance: int = 7
-    # Cap how many keyword-survivors we spend Claude tokens on per run.
-    llm_max_candidates: int = 40
-    # Sources at/above this authority get a "fast lane": every post is judged by
-    # Claude regardless of keyword score, so landmark posts aren't buried. 0.9
-    # covers Anthropic/OpenAI/DeepMind/Lilian Weng in the default sources.yaml.
-    trusted_authority: float = 0.9
+    # Scoring thresholds, weights, caps and the firehose judging budget live in
+    # config/interests.yaml.
 
     db_path: Path = DATA_DIR / "radar.db"
     # Fetch window used only on a cold DB; afterwards it derives from
