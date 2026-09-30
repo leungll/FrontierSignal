@@ -7,6 +7,7 @@ the original RSS/Atom excerpt untouched.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from html.parser import HTMLParser
 
 import httpx
@@ -74,19 +75,35 @@ def extract(html: str) -> str:
 # Statuses worth one retry: transient throttling / edge hiccups. A 404 or 401 is
 # permanent (missing page / paywall), so we don't waste a second request on it.
 _RETRY_STATUS = {429, 500, 502, 503, 504}
+# Misses no fetcher can fix: the page is gone or behind a login. Everything else
+# (bot challenges, JS-only shells, timeouts) is worth one fallback attempt.
+_PERMANENT_STATUS = {401, 404, 410}
+
+# Fallback fetcher: url -> page text ("" on failure). Blocking; run in a thread.
+Fallback = Callable[[str], str]
 
 
-async def enrich(items: list[Item], *, timeout: float, concurrency: int = 4) -> list[Item]:
+async def enrich(
+    items: list[Item],
+    *,
+    timeout: float,
+    concurrency: int = 4,
+    fallback: Fallback | None = None,
+) -> list[Item]:
     """Attach extracted article text to items in place and return them.
 
     Fetch failures are expected and structural (paywalls, 404s, JS-only pages, bot
-    blocks), not bugs. We retry once on transient statuses and log every miss with
-    its reason so the miss rate is observable — a spike means summaries silently
+    blocks), not bugs. We retry once on transient statuses. When our own GET still
+    fails for a reason other than a permanent miss, `fallback` (a fetcher that can
+    get past what we can't, e.g. Claude's web_fetch) gets one try — a general rule
+    for any site, not a per-publisher special case. Every miss is logged with its
+    reason so the miss rate is observable — a spike means summaries silently
     degrade to "full text unavailable", which is worth noticing.
     """
     sem = asyncio.Semaphore(concurrency)
     headers = {"User-Agent": BROWSER_UA}
     misses: list[str] = []
+    rescued: list[str] = []
 
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
 
@@ -96,26 +113,44 @@ async def enrich(items: list[Item], *, timeout: float, concurrency: int = 4) -> 
                 response = await client.get(url, headers=headers)
             return response
 
+        async def direct(item: Item) -> str | None:
+            """Our own GET. Returns None on success, else the miss reason."""
+            try:
+                response = await fetch(item.url)
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                log.info("fulltext.skipped", url=item.url, status=exc.response.status_code)
+                return f"http {exc.response.status_code}"
+            except (httpx.HTTPError, ValueError) as exc:
+                log.info("fulltext.skipped", url=item.url, error=str(exc))
+                return type(exc).__name__
+            content_type = response.headers.get("content-type", "").lower()
+            if "html" not in content_type:
+                return f"non-html: {content_type[:30]}"
+            text = extract(response.text)
+            if len(text) < MIN_BODY_CHARS:
+                return f"thin: {len(text)} chars"
+            item.full_text = text
+            return None
+
         async def one(item: Item) -> None:
             async with sem:
-                try:
-                    response = await fetch(item.url)
-                    response.raise_for_status()
-                    content_type = response.headers.get("content-type", "").lower()
-                    if "html" not in content_type:
-                        misses.append(f"{item.url} (non-html: {content_type[:30]})")
-                        return
-                    text = extract(response.text)
+                reason = await direct(item)
+                if reason is None:
+                    return
+                permanent = any(reason == f"http {s}" for s in _PERMANENT_STATUS)
+                if fallback is not None and not permanent:
+                    try:
+                        text = (await asyncio.to_thread(fallback, item.url)).strip()
+                    except Exception as exc:  # the fallback is best-effort too
+                        log.info("fulltext.fallback_failed", url=item.url, error=str(exc))
+                        text = ""
                     if len(text) >= MIN_BODY_CHARS:
-                        item.full_text = text
-                    else:
-                        misses.append(f"{item.url} (thin: {len(text)} chars)")
-                except httpx.HTTPStatusError as exc:
-                    misses.append(f"{item.url} (http {exc.response.status_code})")
-                    log.info("fulltext.skipped", url=item.url, status=exc.response.status_code)
-                except (httpx.HTTPError, ValueError) as exc:
-                    misses.append(f"{item.url} ({type(exc).__name__})")
-                    log.info("fulltext.skipped", url=item.url, error=str(exc))
+                        item.full_text = text[:MAX_TEXT_CHARS]
+                        rescued.append(item.url)
+                        return
+                    reason += ", fallback failed"
+                misses.append(f"{item.url} ({reason})")
 
         await asyncio.gather(*(one(item) for item in items))
 
@@ -125,6 +160,7 @@ async def enrich(items: list[Item], *, timeout: float, concurrency: int = 4) -> 
         enriched=enriched,
         total=len(items),
         missed=len(misses),
+        rescued=rescued or None,
         misses=misses or None,
     )
     return items

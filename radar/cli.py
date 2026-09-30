@@ -386,11 +386,19 @@ def run(
 
         # Fetch full article text only for final candidates. Feed snippets are
         # often too thin to support a useful stand-alone engineering summary.
+        # Pages that refuse our GET (bot challenges) fall back to the provider's
+        # fetcher when it has one (Claude's web_fetch), run on the cheap filter model.
+        fetch_page = getattr(llm_client, "fetch_page", None)
         asyncio.run(
             fulltext.enrich(
                 selected,
                 timeout=settings.http_timeout,
                 concurrency=min(settings.max_concurrency, 4),
+                fallback=(
+                    (lambda url: fetch_page(url, model=settings.filter_model))
+                    if fetch_page and llm_client.available
+                    else None
+                ),
             )
         )
 
